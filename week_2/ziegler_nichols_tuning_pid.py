@@ -26,7 +26,6 @@ init_joint_angles = sim.GetInitMotorAngles()
 print(f"Initial joint angles: {init_joint_angles}")
 
 
-
 # single joint tuning
 #episode_duration is specified in seconds
 def simulate_with_given_pid_values(sim_, kp, joints_id, regulation_displacement=0.1, episode_duration=10, plot=False):
@@ -91,48 +90,96 @@ def simulate_with_given_pid_values(sim_, kp, joints_id, regulation_displacement=
         current_time += time_step
         #print("current time in seconds",current_time)
 
-    
-    # TODO make the plot for the current joint
-    
+    q_mes_all = np.array(q_mes_all)
+
+    if plot:
+        # Plot the results for the current joint
+        plt.plot(np.arange(len(q_mes_all)) * time_step, q_mes_all[:, joints_id])
+        plt.title(f"Joint {joints_id} Position with Kp = {kp}")
+        plt.xlabel("Time [s]")
+        plt.ylabel("Joint Position [rad]")
+        plt.grid(True)
+        plt.show()
     
     return q_mes_all
      
 
 
 
-def perform_frequency_analysis(data, dt):
+def perform_frequency_analysis(data, dt, plot=False):
     n = len(data)
     yf = fft(data)
     xf = fftfreq(n, dt)[:n//2]
     power = 2.0/n * np.abs(yf[:n//2])
 
-    # Optional: Plot the spectrum
-    plt.figure()
-    plt.plot(xf, power)
-    plt.title("FFT of the signal")
-    plt.xlabel("Frequency in Hz")
-    plt.ylabel("Amplitude")
-    plt.grid(True)
-    plt.show()
+    if plot:
+        # Optional: Plot the spectrum
+        plt.figure()
+        plt.plot(xf, power)
+        plt.title("FFT of the signal")
+        plt.xlabel("Frequency in Hz")
+        plt.ylabel("Amplitude")
+        plt.grid(True)
+        plt.show()
 
     return xf, power
-
-
-# TODO Implement the table in thi function
-
-
-
 
 if __name__ == '__main__':
     joint_id = 0  # Joint ID to tune
     regulation_displacement = 1.0  # Displacement from the initial joint position
-    init_gain=1000 
-    gain_step=1.5 
+    init_gain=20
+    gain_step=0.1
     max_gain=10000 
     test_duration=20 # in seconds
-    
 
-    # TODO using simulate_with_given_pid_values() and perform_frequency_analysis() write you code to test different Kp values 
-    # for each joint, bring the system to oscillation and compute the the PD parameters using the Ziegler-Nichols method
+    kps = np.array([0]*dyn_model.getNumberofActuatedJoints())
+    kds = np.array([0]*dyn_model.getNumberofActuatedJoints())
 
+    #simulate_with_given_pid_values(sim, 16.0, 6, regulation_displacement, test_duration, True)
+
+    while joint_id < dyn_model.getNumberofActuatedJoints():
+        print(f"-----JOINT {joint_id} SIMULATION-----")
+        cur_kp = init_gain
+        while cur_kp < max_gain:
+            joint_position_data = simulate_with_given_pid_values(sim, cur_kp, joint_id, regulation_displacement, test_duration, False)
+            print(joint_position_data.shape)
+
+            dt = sim.GetTimeStep()
+            xf, power = perform_frequency_analysis(joint_position_data[:, joint_id], dt, False)
+            
+            # Ignore the DC component (0 Hz)
+            xf_no_dc = xf[1:]  # Exclude the first element (0 Hz)
+            power_no_dc = power[1:]
+
+            print(f"Xf (no DC) = {xf_no_dc}, Power (no DC) = {power_no_dc}")
+
+            # Check for sustained oscillations (based on power spectrum analysis)
+            if np.max(power_no_dc) > 0.1:  # Adjust this threshold if necessary
+                print(f"Sustained oscillations detected at Kp = {cur_kp}")
+                
+                ku = cur_kp
+                
+                # Find Tu using the dominant frequency
+                dominant_frequency = xf_no_dc[np.argmax(power_no_dc)]  # Find dominant frequency excluding 0 Hz
+                if dominant_frequency != 0:
+                    tu = 1 / dominant_frequency
+                    kps[joint_id] = 0.8 * ku
+                    kds[joint_id] = 0.1 * ku * tu
+                    print(f"Ku = {ku}, Tu = {tu}")
+                    print(f"Tuned Proportional Gain (Kp): {kps[joint_id]}")
+                    print(f"Tuned Derivative Gain (Kd): {kds[joint_id]}")
+
+                    break
+                else:
+                    print(f"Invalid dominant frequency (0 Hz) at Kp = {cur_kp}. Continuing to search...")
+
+            cur_kp += gain_step
+        joint_id += 1
+
+    print(f"Kp's = {kps}")
+    print(f"Kd's = {kds}")
+
+    # Computed PD parameters using the Ziegler-Nichols method
+    #Kp's [16.0, 25.6, 16.0, 16.0, 16.0, 16.0, 16.0]
+    #Kd's [2.8571428571428568, 1.777777777777778, 2.8571428571428568, 2.8571428571428568, 2.8571428571428568, 2.8571428571428568, 2.6666666666666665]
    
