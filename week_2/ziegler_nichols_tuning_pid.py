@@ -5,7 +5,6 @@ import time
 from matplotlib import pyplot as plt
 from simulation_and_control import pb, MotorCommands, PinWrapper, feedback_lin_ctrl, SinusoidalReference, CartesianDiffKin
 
-
 # Configuration for the simulation
 conf_file_name = "pandaconfig.json"  # Configuration file for the robot
 cur_dir = os.path.dirname(os.path.abspath(__file__))
@@ -127,7 +126,7 @@ def perform_frequency_analysis(data, dt, plot=False):
 if __name__ == '__main__':
     joint_id = 0  # Joint ID to tune
     regulation_displacement = 1.0  # Displacement from the initial joint position
-    init_gain=20
+    init_gain=15
     gain_step=0.1
     max_gain=10000 
     test_duration=20 # in seconds

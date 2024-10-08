@@ -3,3 +3,5 @@ models/
 
 # Ignore the egg-info directory
 configs/
+
+.DS_Store
