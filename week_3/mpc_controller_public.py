@@ -4,6 +4,7 @@ import os
 import matplotlib.pyplot as plt
 from simulation_and_control import pb, MotorCommands, PinWrapper, feedback_lin_ctrl, dyn_cancel, SinusoidalReference, CartesianDiffKin
 from regulator_model import RegulatorModel
+import pandas as pd
 
 def initialize_simulation(conf_file_name):
     """Initialize simulation and dynamic model."""
@@ -52,8 +53,20 @@ def getSystemMatrices(sim, num_joints, damping_coefficients=None):
     
     time_step = sim.GetTimeStep()
     
-    # TODO: Finish the system matrices 
-    
+    I = np.eye(num_joints)
+
+    A = np.zeros((num_states, num_states))
+    A[:num_joints, :num_joints] = I
+    A[:num_joints, num_joints:] = time_step * I
+    A[num_joints:, num_joints:] = I
+
+    B = np.zeros((num_states, num_controls))
+    B[num_joints:, :] = time_step * I
+
+    if damping_coefficients is not None:
+        damping_matrix = np.diag(damping_coefficients)
+        A[num_joints:, num_joints:] -= time_step * damping_matrix
+
     return A, B
 
 
@@ -69,7 +82,7 @@ def getCostMatrices(num_joints):
     num_controls = num_joints
     
     # Q = 1 * np.eye(num_states)  # State cost matrix
-    Q = 1000 * np.eye(num_states)
+    Q = 10000 * np.eye(num_states)
     Q[num_joints:, num_joints:] = 0.0
     
     R = 0.1 * np.eye(num_controls)  # Control input cost matrix
@@ -110,7 +123,7 @@ def main():
     H,F = regulator.compute_H_and_F(S_bar, T_bar, Q_bar, R_bar)
     
     # Main control loop
-    episode_duration = 5
+    episode_duration = 10
     current_time = 0
     time_step = sim.GetTimeStep()
     steps = int(episode_duration/time_step)

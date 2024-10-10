@@ -1,9 +1,11 @@
 import os 
 import numpy as np
 from numpy.fft import fft, fftfreq
-import time
+import pandas as pd
+from tabulate import tabulate
 from matplotlib import pyplot as plt
-from simulation_and_control import pb, MotorCommands, PinWrapper, feedback_lin_ctrl, SinusoidalReference, CartesianDiffKin
+from simulation_and_control import pb, MotorCommands, PinWrapper, feedback_lin_ctrl
+
 
 # Configuration for the simulation
 conf_file_name = "pandaconfig.json"  # Configuration file for the robot
@@ -23,6 +25,7 @@ num_joints = dyn_model.getNumberofActuatedJoints()
 init_joint_angles = sim.GetInitMotorAngles()
 
 print(f"Initial joint angles: {init_joint_angles}")
+
 
 
 # single joint tuning
@@ -81,22 +84,26 @@ def simulate_with_given_pid_values(sim_, kp, joints_id, regulation_displacement=
         qd_mes_all.append(qd_mes)
         q_d_all.append(q_des)
         qd_d_all.append(qd_des)
-        #cur_regressor = dyn_model.ComputeDyanmicRegressor(q_mes,qd_mes, qdd_est)
-        #regressor_all = np.vstack((regressor_all, cur_regressor))
+        # cur_regressor = dyn_model.ComputeDyanmicRegressor(q_mes,qd_mes, qdd_est)
+        # regressor_all = np.vstack((regressor_all, cur_regressor))
 
-        #time.sleep(0.01)  # Slow down the loop for better visualization
+        # time.sleep(0.01)  # Slow down the loop for better visualization
         # get real time
         current_time += time_step
         #print("current time in seconds",current_time)
 
-    q_mes_all = np.array(q_mes_all)
-
+    
+    # TODO make the plot for the current joint
     if plot:
-        # Plot the results for the current joint
-        plt.plot(np.arange(len(q_mes_all)) * time_step, q_mes_all[:, joints_id])
-        plt.title(f"Joint {joints_id} Position with Kp = {kp}")
-        plt.xlabel("Time [s]")
-        plt.ylabel("Joint Position [rad]")
+        x = np.array(q_mes_all)[:, joints_id:joints_id+1]
+        plt.figure()
+        plt.plot(x)
+        plt.axhline(y=np.max(x), linestyle='--', color='r')
+        plt.axhline(y=np.min(x), linestyle='--', color='r')
+        plt.title(f"Joint {joints_id} position tracking with kp: {kp}")
+        plt.xlabel("Time in seconds")
+        plt.ylabel("Joint angle in rad")
+        plt.legend(["q_mes", "q_max", "q_min"])
         plt.grid(True)
         plt.show()
     
@@ -104,18 +111,17 @@ def simulate_with_given_pid_values(sim_, kp, joints_id, regulation_displacement=
      
 
 
-
-def perform_frequency_analysis(data, dt, plot=False):
+def perform_frequency_analysis(data, dt, kp, plot=False):
     n = len(data)
     yf = fft(data)
     xf = fftfreq(n, dt)[:n//2]
     power = 2.0/n * np.abs(yf[:n//2])
 
+    # Optional: Plot the spectrum
     if plot:
-        # Optional: Plot the spectrum
         plt.figure()
         plt.plot(xf, power)
-        plt.title("FFT of the signal")
+        plt.title(f"FFT of the signal with kp: {kp}")
         plt.xlabel("Frequency in Hz")
         plt.ylabel("Amplitude")
         plt.grid(True)
@@ -123,62 +129,82 @@ def perform_frequency_analysis(data, dt, plot=False):
 
     return xf, power
 
+
+# TODO Implement the table in this function
+def show_table(kus, tus):
+    tables = open("tables.txt", "w")
+    for joint_id in range(num_joints):
+        Ku = kus[joint_id]
+        Tu = tus[joint_id]
+        data = {
+            "Control Type": ["P", "PI", "PD", "classic PID", "Pessen Integral Rule", "some overshoot", "no overshoot"],
+            "Kp": [f"{0.5*Ku:.3f}", f"{0.45*Ku:.3f}", f"{0.8*Ku:.3f}", f"{0.6*Ku:.3f}", f"{0.7*Ku:.3f}", f"{0.33*Ku:.3f}", f"{0.20*Ku:.3f}"],
+            "Ti": ["–", f"{0.83*Tu:.3f}", "–", f"{0.5*Tu:.3f}", f"{0.4*Tu:.3f}", f"{0.50*Tu:.3f}", f"{0.50*Tu:.3f}"],
+            "Td": ["–", "–", f"{0.125*Tu:.3f}", f"{0.125*Tu:.3f}", f"{0.15*Tu:.3f}", f"{0.33*Tu:.3f}", f"{0.33*Tu:.3f}"],
+            "Ki": ["–", f"{0.54*Ku/Tu:.3f}", "–", f"{1.2*Ku/Tu:.3f}", f"{1.75*Ku/Tu:.3f}", f"{0.66*Ku/Tu:.3f}", f"{0.40*Ku/Tu:.3f}"],
+            "Kd": ["–", "–", f"{0.10*Ku*Tu:.3f}", f"{0.075*Ku*Tu:.3f}", f"{0.105*Ku*Tu:.3f}", f"{0.11*Ku*Tu:.3f}", f"{0.066*Ku*Tu:.3f}"]
+        }
+
+        # Create the DataFrame
+        df = pd.DataFrame(data)
+
+        # Use tabulate to print the DataFrame as a table
+        tables.write(f"Ziegler-Nichols Method Table for Joint {joint_id+1}\n")
+        tables.write(tabulate(df, headers='keys', tablefmt='grid', showindex=False, colalign=("center", "center", "center", "center", "center", "center")))
+        tables.write("\n\n")
+
+
 if __name__ == '__main__':
     joint_id = 0  # Joint ID to tune
     regulation_displacement = 1.0  # Displacement from the initial joint position
-    init_gain=15
-    gain_step=0.1
-    max_gain=10000 
+    init_gain=18  # Initial Kp value
+    gain_step=1
+    max_gain=21 
     test_duration=20 # in seconds
+    
+    # TODO using simulate_with_given_pid_values() and perform_frequency_analysis() write you code to test different Kp values 
+    # for each joint, bring the system to oscillation and compute the the PD parameters using the Ziegler-Nichols method
+    kps = [init_gain for i in range(7)] # initial kp values
+    kds = [0,0,0,0,0,0,0] # initial kd values
+    kus = [0,0,0,0,0,0,0] # ultimate gains
+    tus = [0,0,0,0,0,0,0] # ultimate periods
 
-    kps = np.array([0]*dyn_model.getNumberofActuatedJoints())
-    kds = np.array([0]*dyn_model.getNumberofActuatedJoints())
+    for joint_id in range(num_joints):
+        cur_kp = kps[joint_id]
 
-    #simulate_with_given_pid_values(sim, 16.0, 6, regulation_displacement, test_duration, True)
-
-    while joint_id < dyn_model.getNumberofActuatedJoints():
-        print(f"-----JOINT {joint_id} SIMULATION-----")
-        cur_kp = init_gain
         while cur_kp < max_gain:
-            joint_position_data = simulate_with_given_pid_values(sim, cur_kp, joint_id, regulation_displacement, test_duration, False)
-            print(joint_position_data.shape)
+            print(f"Testing Kp: {0.8 * cur_kp:.1f} for Joint {joint_id+1}")
+            q_mes_all = simulate_with_given_pid_values(sim, cur_kp, joint_id, regulation_displacement, test_duration)
+
+            q_mes_joint = np.array(q_mes_all)[:, joint_id]
 
             dt = sim.GetTimeStep()
-            xf, power = perform_frequency_analysis(joint_position_data[:, joint_id], dt, False)
-            
-            # Ignore the DC component (0 Hz)
-            xf_no_dc = xf[1:]  # Exclude the first element (0 Hz)
-            power_no_dc = power[1:]
 
-            print(f"Xf (no DC) = {xf_no_dc}, Power (no DC) = {power_no_dc}")
+            xf, power = perform_frequency_analysis(q_mes_joint, dt, cur_kp)
+        
+            xf_no_dc = xf[1:] # Remove DC component
+            power_no_dc = power[1:] # Remove DC component
 
-            # Check for sustained oscillations (based on power spectrum analysis)
-            if np.max(power_no_dc) > 0.1:  # Adjust this threshold if necessary
-                print(f"Sustained oscillations detected at Kp = {cur_kp}")
-                
+            max_power = np.max(power_no_dc)
+
+            if max_power > 0.1:
+                print(f"max power: {max_power}")
+                print(f"Oscillation detected with Kp = {0.8 * cur_kp:.1f}.")
                 ku = cur_kp
                 
-                # Find Tu using the dominant frequency
-                dominant_frequency = xf_no_dc[np.argmax(power_no_dc)]  # Find dominant frequency excluding 0 Hz
-                if dominant_frequency != 0:
-                    tu = 1 / dominant_frequency
+                dominant_freq = xf_no_dc[np.argmax(power_no_dc)]
+                print(f"Dominant frequency = {dominant_freq} Hz")
+                if dominant_freq > 0.1:
+                    tu = 1 / dominant_freq
                     kps[joint_id] = 0.8 * ku
                     kds[joint_id] = 0.1 * ku * tu
-                    print(f"Ku = {ku}, Tu = {tu}")
-                    print(f"Tuned Proportional Gain (Kp): {kps[joint_id]}")
-                    print(f"Tuned Derivative Gain (Kd): {kds[joint_id]}")
-
-                    break
-                else:
-                    print(f"Invalid dominant frequency (0 Hz) at Kp = {cur_kp}. Continuing to search...")
+                    kus[joint_id] = ku
+                    tus[joint_id] = tu
+                    
 
             cur_kp += gain_step
-        joint_id += 1
+    
+    print(f"Final Kp values: {kps}")
+    show_table(kus, tus)
 
-    print(f"Kp's = {kps}")
-    print(f"Kd's = {kds}")
-
-    # Computed PD parameters using the Ziegler-Nichols method
-    #Kp's [16.0, 25.6, 16.0, 16.0, 16.0, 16.0, 16.0]
-    #Kd's [2.8571428571428568, 1.777777777777778, 2.8571428571428568, 2.8571428571428568, 2.8571428571428568, 2.8571428571428568, 2.6666666666666665]
    

@@ -4,4 +4,5 @@ models/
 # Ignore the egg-info directory
 configs/
 
-.DS_Store
+# Ignore test.py
+test.py
