@@ -36,7 +36,7 @@ def simulate_with_given_pid_values(sim_, kp, joints_id, regulation_displacement=
     sim_.ResetPose()
     
     # updating the kp value for the joint we want to tune
-    kp_vec = np.array([1000]*dyn_model.getNumberofActuatedJoints())
+    kp_vec = np.array([1000.0]*dyn_model.getNumberofActuatedJoints())
     kp_vec[joints_id] = kp
 
     kd = np.array([0]*dyn_model.getNumberofActuatedJoints())
@@ -157,8 +157,8 @@ def show_table(kus, tus):
 if __name__ == '__main__':
     joint_id = 0  # Joint ID to tune
     regulation_displacement = 1.0  # Displacement from the initial joint position
-    init_gain=18  # Initial Kp value
-    gain_step=1
+    init_gain=18.0  # Initial Kp value
+    gain_step=1.0
     max_gain=21 
     test_duration=20 # in seconds
     
@@ -200,7 +200,7 @@ if __name__ == '__main__':
                     kds[joint_id] = 0.1 * ku * tu
                     kus[joint_id] = ku
                     tus[joint_id] = tu
-                    
+                # break
 
             cur_kp += gain_step
     

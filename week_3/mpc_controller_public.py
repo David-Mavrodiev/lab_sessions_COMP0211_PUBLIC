@@ -1,3 +1,4 @@
+import json
 import numpy as np
 import time
 import os
@@ -17,7 +18,9 @@ def initialize_simulation(conf_file_name):
     dyn_model = PinWrapper(conf_file_name, "pybullet", ext_names, source_names, False, 0, cur_dir)
     num_joints = dyn_model.getNumberofActuatedJoints()
     
-    return sim, dyn_model, num_joints
+    damping_coefficients = json.load(open(os.path.join(cur_dir, "configs", conf_file_name)))["robot_pybullet"]["motor_damping_coeff"]
+
+    return sim, dyn_model, num_joints, damping_coefficients
 
 
 def print_joint_info(sim, dyn_model, controlled_frame_name):
@@ -51,21 +54,21 @@ def getSystemMatrices(sim, num_joints, damping_coefficients=None):
     num_states = 2 * num_joints
     num_controls = num_joints
     
-    time_step = sim.GetTimeStep()
+    # time_step = sim.GetTimeStep() # No discretization needed for MPC
     
     I = np.eye(num_joints)
 
     A = np.zeros((num_states, num_states))
     A[:num_joints, :num_joints] = I
-    A[:num_joints, num_joints:] = time_step * I
-    A[num_joints:, num_joints:] = I
+    A[:num_joints, num_joints:] = I
+    A[num_joints:, num_joints:] = I # * time_step
 
     B = np.zeros((num_states, num_controls))
-    B[num_joints:, :] = time_step * I
+    B[num_joints:, :] = I # * time_step
 
     if damping_coefficients is not None:
         damping_matrix = np.diag(damping_coefficients)
-        A[num_joints:, num_joints:] -= time_step * damping_matrix
+        A[num_joints:, num_joints:] = I - damping_matrix # * time_step
 
     return A, B
 
@@ -96,7 +99,7 @@ def main():
     controlled_frame_name = "panda_link8"
     
     # Initialize simulation and dynamic model
-    sim, dyn_model, num_joints = initialize_simulation(conf_file_name)
+    sim, dyn_model, num_joints, damping_coeffs = initialize_simulation(conf_file_name)
     cmd = MotorCommands()
     
     # Print joint information
@@ -107,6 +110,7 @@ def main():
 
     # Define the matrices
     A, B = getSystemMatrices(sim, num_joints)
+    # A, B = getSystemMatrices(sim, num_joints, damping_coeffs) # Uncomment for damping
     Q, R = getCostMatrices(num_joints)
     
     # Measuring all the state
