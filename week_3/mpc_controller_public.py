@@ -54,21 +54,21 @@ def getSystemMatrices(sim, num_joints, damping_coefficients=None):
     num_states = 2 * num_joints
     num_controls = num_joints
     
-    # time_step = sim.GetTimeStep() # No discretization needed for MPC
+    time_step = sim.GetTimeStep()
     
     I = np.eye(num_joints)
 
     A = np.zeros((num_states, num_states))
     A[:num_joints, :num_joints] = I
     A[:num_joints, num_joints:] = I
-    A[num_joints:, num_joints:] = I # * time_step
+    A[num_joints:, num_joints:] = I * time_step
 
     B = np.zeros((num_states, num_controls))
-    B[num_joints:, :] = I # * time_step
+    B[num_joints:, :] = I * time_step
 
     if damping_coefficients is not None:
         damping_matrix = np.diag(damping_coefficients)
-        A[num_joints:, num_joints:] = I - damping_matrix # * time_step
+        A[num_joints:, num_joints:] = I - damping_matrix * time_step
 
     return A, B
 
