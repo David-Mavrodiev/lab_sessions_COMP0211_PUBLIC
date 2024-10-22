@@ -10,17 +10,15 @@ import pandas as pd
 def initialize_simulation(conf_file_name):
     """Initialize simulation and dynamic model."""
     cur_dir = os.path.dirname(os.path.abspath(__file__))
-    sim = pb.SimInterface(conf_file_name, conf_file_path_ext=cur_dir)
+    sim = pb.SimInterface(conf_file_name, conf_file_path_ext=cur_dir, use_gui=False)
     
     ext_names = np.expand_dims(np.array(sim.getNameActiveJoints()), axis=0)
     source_names = ["pybullet"]
     
     dyn_model = PinWrapper(conf_file_name, "pybullet", ext_names, source_names, False, 0, cur_dir)
     num_joints = dyn_model.getNumberofActuatedJoints()
-    
-    damping_coefficients = json.load(open(os.path.join(cur_dir, "configs", conf_file_name)))["robot_pybullet"]["motor_damping_coeff"]
 
-    return sim, dyn_model, num_joints, damping_coefficients
+    return sim, dyn_model, num_joints
 
 
 def print_joint_info(sim, dyn_model, controlled_frame_name):
@@ -56,12 +54,12 @@ def getSystemMatrices(sim, num_joints, damping_coefficients=None):
     
     time_step = sim.GetTimeStep()
     
-    I = np.eye(num_joints)
+    I = np.eye(num_controls)
 
     A = np.zeros((num_states, num_states))
-    A[:num_joints, :num_joints] = I
-    A[:num_joints, num_joints:] = I
-    A[num_joints:, num_joints:] = I * time_step
+    A[:num_joints, :num_joints] = I # Upper left quadrant of A (velocity affected by position)
+    A[:num_joints, num_joints:] = I * time_step # Upper right quadrant of A (position affected by velocity)
+    A[num_joints:, num_joints:] = I # Lower right quadrant of A (velocity affected by control input)
 
     B = np.zeros((num_states, num_controls))
     B[num_joints:, :] = I * time_step
@@ -99,7 +97,7 @@ def main():
     controlled_frame_name = "panda_link8"
     
     # Initialize simulation and dynamic model
-    sim, dyn_model, num_joints, damping_coeffs = initialize_simulation(conf_file_name)
+    sim, dyn_model, num_joints = initialize_simulation(conf_file_name)
     cmd = MotorCommands()
     
     # Print joint information
@@ -110,7 +108,8 @@ def main():
 
     # Define the matrices
     A, B = getSystemMatrices(sim, num_joints)
-    # A, B = getSystemMatrices(sim, num_joints, damping_coeffs) # Uncomment for damping
+    # damping_coefficients = [0.1, 0.1, 0.1, 0.05, 0.05, 0.05]
+    # A, B = getSystemMatrices(sim, num_joints, damping_coefficients) # Uncomment for damping
     Q, R = getCostMatrices(num_joints)
     
     # Measuring all the state
