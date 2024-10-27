@@ -1,0 +1,278 @@
+%--------------------
+% Document type
+% -------------------
+\documentclass[11pt,a4paper]{article}
+
+%-----------------------
+% Input a file which contains all the setup 
+%-----------------------
+\input{setup}
+
+%-----------------------
+% Set pdf information and add title, fill in the fields
+%-----------------------
+\hypersetup{ 	
+pdfsubject = {Estimation and Control},
+pdftitle = {COMP0242 Lab 02},
+pdfauthor = {Joe Farah, David Mavrodiev, and Yukai Wang}
+}
+
+%-----------------------
+% Begin document
+%-----------------------
+\begin{document} %All text i dokumentet hamnar mellan dessa taggar, allt ovanför är formatering av dokumentet
+
+%-----------------------
+% Title, author and date
+%-----------------------
+
+\title{\bfseries\huge COMP0242 Lab 02}
+\author{Joe Farah \and David Mavrodiev \and Yukai Wang}
+\date{\today}
+\maketitle
+
+\section{Introduction}
+This lab focuses on the implementation and tuning of Model Predictive Control (MPC) for a multi-joint robot arm system. The objective is to regulate the robot’s trajectory by applying linear MPC, considering the complexities of its nonlinear dynamics. The tasks involve finding the system matrices (\textbf{A} and \textbf{B}), and cost matrices (\textbf{Q} and \textbf{R}), and testing how they affect the controller’s performance. Additionally, the lab compares different parameter settings to investigate their effects on system stability, trajectory accuracy, and control effort. The final task includes the optional consideration of joint damping in the system matrices, testing the robustness of the control design.
+
+\section{Materials and Methods}
+\label{sec:materials_and_methods}
+
+In this section you'll describe how you went about solving the problem identified in the introduction.
+
+\subsection{Materials}
+\label{subsec:materials}
+
+This lists the software and systems used and provides a brief explanation of what they are for. For example, you might list the Pinnochio simulator, the use of numpy, etc. This is important because you should think critically about the software used. It's very often the case that people end up with a sprawling mass of hundreds of software packages simply because they use one function from one package.
+
+This is most likely just to be a list of software.
+
+\subsection{Methods/Procedure}
+\label{subsec:methods}
+
+What approach was used to solve the problem?
+
+Again, there no hard and fast rules in terms of size. However, you need to provide enough information to explain the approach you took and citations if necessary.
+
+We'd guess 100--200 words.
+
+An example citation would be using Kalman filter \cite{KF}.
+
+To describe equations 
+
+For example, it might be the case that you have to solve the problem using \eqref{eqn:axb}, where
+\begin{equation}
+\mathbf{A} \mathbf{x} = \mathbf{b}
+\label{eqn:axb}
+\end{equation}
+In this equation,
+\begin{itemize}
+    \item \( \mathbf{A} \) is a matrix of coefficients,
+    \item \( \mathbf{x} \) is the vector of unknown variables,
+    \item \( \mathbf{b} \) is the vector of constants.
+\end{itemize}
+
+The goal is to find the vector \( \mathbf{x} \) that satisfies this equation. Various methods can be employed to solve for \( \mathbf{x} \), such as Gaussian elimination, matrix inversion, or iterative approaches. 
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Results of System Matrices A and B}
+
+The completion of the \texttt{getSystemMatrices()} function yielded the A and B matrices, which represent the linearized dynamics of the robot joints. The A matrix accurately models how joint positions evolve based on current velocities over time steps, while the B matrix describes how the control inputs (accelerations) affect the joint velocities. These matrices allow the MPC algorithm to predict future states by leveraging the relationship between current joint states and control inputs. The resulting system captures the key dynamics required for the MPC to optimize the robot's motion, balancing position tracking with smooth control input application.
+
+The following figures illustrate the combined position and velocity tracking for each joint. For each joint, the actual measured values are compared to the desired reference trajectory. The graphs provide insight into how well the control system, utilizing the A and B matrices, is able to track both position and velocity over time.
+
+% Example for joint 1 (repeat similar code for each joint)
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{./figures/joint_1_tracking.png}
+    \caption{Position and Velocity Tracking for Joint 1}
+    \label{fig:joint_1_tracking}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{./figures/joint_2_tracking.png}
+    \caption{Position and Velocity Tracking for Joint 2}
+    \label{fig:joint_2_tracking}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{./figures/joint_3_tracking.png}
+    \caption{Position and Velocity Tracking for Joint 3}
+    \label{fig:joint_3_tracking}
+\end{figure}
+
+% Repeat for all joints (up to 7 in total)
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{./figures/joint_4_tracking.png}
+    \caption{Position and Velocity Tracking for Joint 4}
+    \label{fig:joint_4_tracking}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{./figures/joint_5_tracking.png}
+    \caption{Position and Velocity Tracking for Joint 5}
+    \label{fig:joint_5_tracking}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{./figures/joint_6_tracking.png}
+    \caption{Position and Velocity Tracking for Joint 6}
+    \label{fig:joint_6_tracking}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{./figures/joint_7_tracking.png}
+    \caption{Position and Velocity Tracking for Joint 7}
+    \label{fig:joint_7_tracking}
+\end{figure}
+
+\FloatBarrier
+
+\subsection{Comparison between different cost values}
+
+The experiment evaluates the performance of the MPC system by adjusting the cost matrix \( Q \) to values of 1000, 10000, and 100000, comparing the system’s position and velocity tracking for each joint. Increasing \( Q \) prioritizes position accuracy, resulting in tighter position tracking at the cost of more aggressive control inputs, leading to higher velocity deviations. For lower \( Q \) values (e.g., 1000), the controller allows smoother velocity transitions but exhibits larger position errors. As \( Q \) increases to 100000, the position tracking becomes more precise, but velocity control becomes less smooth, showing more oscillations or abrupt changes. Overall, lower \( Q \) values balance smooth control and position tracking, while higher \( Q \) values focus on reducing position errors at the expense of smoother velocity behavior.
+The following figures compare the position and velocity tracking for each joint under different \( Q \) values (1000, 10000, and 100000).
+
+% Plot for Joint 1
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{./figures/joint_1_tracking_Q_comparison.png}
+    \caption{Position and Velocity Tracking for Joint 1 (Q = 1000, 10000, 100000)}
+    \label{fig:joint_1_tracking}
+\end{figure}
+
+% Plot for Joint 2
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{./figures/joint_2_tracking_Q_comparison.png}
+    \caption{Position and Velocity Tracking for Joint 2 (Q = 1000, 10000, 100000)}
+    \label{fig:joint_2_tracking}
+\end{figure}
+
+% Plot for Joint 3
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{./figures/joint_3_tracking_Q_comparison.png}
+    \caption{Position and Velocity Tracking for Joint 3 (Q = 1000, 10000, 100000)}
+    \label{fig:joint_3_tracking}
+\end{figure}
+
+% Plot for Joint 4
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{./figures/joint_4_tracking_Q_comparison.png}
+    \caption{Position and Velocity Tracking for Joint 4 (Q = 1000, 10000, 100000)}
+    \label{fig:joint_4_tracking}
+\end{figure}
+
+% Plot for Joint 5
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{./figures/joint_5_tracking_Q_comparison.png}
+    \caption{Position and Velocity Tracking for Joint 5 (Q = 1000, 10000, 100000)}
+    \label{fig:joint_5_tracking}
+\end{figure}
+
+% Plot for Joint 6
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{./figures/joint_6_tracking_Q_comparison.png}
+    \caption{Position and Velocity Tracking for Joint 6 (Q = 1000, 10000, 100000)}
+    \label{fig:joint_6_tracking}
+\end{figure}
+
+% Plot for Joint 7
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{./figures/joint_7_tracking_Q_comparison.png}
+    \caption{Position and Velocity Tracking for Joint 7 (Q = 1000, 10000, 100000)}
+    \label{fig:joint_7_tracking}
+\end{figure}
+\FloatBarrier
+
+\subsection{Impact of Penalizing Velocity Deviations}
+
+When the line \texttt{Q[num\_joints:, num\_joints:] = 0.0} is commented out, the controller begins to penalize both position and velocity deviations. This results in smoother velocity profiles, as the MPC tries to minimize the error in both position and velocity. However, the emphasis on controlling velocity deviations may lead to slower convergence in position tracking since the controller must balance reducing errors in both states. Without the velocity penalty, the system applies more aggressive control to achieve better position accuracy, but this can introduce oscillations in velocity. Introducing penalties for velocity deviations leads to smoother control actions, though it sacrifices some responsiveness in correcting position errors. The following figures illustrate the position and velocity tracking for each joint with \( Q = 1000 \), showing the effect of penalizing both position and velocity deviations.
+
+% Plot for Joint 1
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{./figures/joint_1_tracking_with_penalizing_velocity_deviations.png}
+    \caption{Position and Velocity Tracking for Joint 1 (Q = 1000, with velocity penalties)}
+    \label{fig:joint_1_tracking}
+\end{figure}
+
+% Plot for Joint 2
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{./figures/joint_2_tracking_with_penalizing_velocity_deviations.png}
+    \caption{Position and Velocity Tracking for Joint 2 (Q = 1000, with velocity penalties)}
+    \label{fig:joint_2_tracking}
+\end{figure}
+
+% Plot for Joint 3
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{./figures/joint_3_tracking_with_penalizing_velocity_deviations.png}
+    \caption{Position and Velocity Tracking for Joint 3 (Q = 1000, with velocity penalties)}
+    \label{fig:joint_3_tracking}
+\end{figure}
+
+% Plot for Joint 4
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{./figures/joint_4_tracking_with_penalizing_velocity_deviations.png}
+    \caption{Position and Velocity Tracking for Joint 4 (Q = 1000, with velocity penalties)}
+    \label{fig:joint_4_tracking}
+\end{figure}
+
+% Plot for Joint 5
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{./figures/joint_5_tracking_with_penalizing_velocity_deviations.png}
+    \caption{Position and Velocity Tracking for Joint 5 (Q = 1000, with velocity penalties)}
+    \label{fig:joint_5_tracking}
+\end{figure}
+
+% Plot for Joint 6
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{./figures/joint_6_tracking_with_penalizing_velocity_deviations.png}
+    \caption{Position and Velocity Tracking for Joint 6 (Q = 1000, with velocity penalties)}
+    \label{fig:joint_6_tracking}
+\end{figure}
+
+% Plot for Joint 7
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{./figures/joint_7_tracking_with_penalizing_velocity_deviations.png}
+    \caption{Position and Velocity Tracking for Joint 7 (Q = 1000, with velocity penalties)}
+    \label{fig:joint_7_tracking}
+\end{figure}
+\FloatBarrier
+
+\section{Discussion}
+\label{sec:discussion}
+
+What do these results mean? How can you tie them to what's taught in the lecture and how robots might work with them?
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+Summarise the conclusions your group drew. This includes things such as how well the solution worked and also how easy / difficult you found the problem to be and where the challenges lie. 
+
+
+
+
+
+\bibliographystyle{IEEEtran}
+\bibliography{myreferences}
+
+\end{document}

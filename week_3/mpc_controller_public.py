@@ -8,7 +8,7 @@ from regulator_model import RegulatorModel
 def initialize_simulation(conf_file_name):
     """Initialize simulation and dynamic model."""
     cur_dir = os.path.dirname(os.path.abspath(__file__))
-    sim = pb.SimInterface(conf_file_name, conf_file_path_ext=cur_dir)
+    sim = pb.SimInterface(conf_file_name, conf_file_path_ext=cur_dir, use_gui=False)
     
     ext_names = np.expand_dims(np.array(sim.getNameActiveJoints()), axis=0)
     source_names = ["pybullet"]
@@ -52,7 +52,25 @@ def getSystemMatrices(sim, num_joints, damping_coefficients=None):
     
     time_step = sim.GetTimeStep()
     
-    # TODO: Finish the system matrices 
+    # Initialize the A and B matrices with appropriate sizes
+    A = np.zeros((num_states, num_states))  # State transition matrix
+    B = np.zeros((num_states, num_controls))  # Control input matrix
+
+    # Filling in the A matrix
+    # Top right block is I * Δt (how positions evolve due to velocities)
+    A[:num_joints, num_joints:] = np.eye(num_joints) * time_step
+    
+    # Bottom right block is I (how velocities evolve with control inputs)
+    A[num_joints:, num_joints:] = np.eye(num_joints)
+    
+    # Filling in the B matrix
+    # Control inputs directly affect velocities (accelerations)
+    B[num_joints:, :] = np.eye(num_joints) * time_step
+
+    # Optionally add damping to the system
+    if damping_coefficients is not None:
+        damping = np.diag(damping_coefficients)
+        A[num_joints:, num_joints:] -= damping * time_step
     
     return A, B
 
@@ -70,7 +88,7 @@ def getCostMatrices(num_joints):
     
     # Q = 1 * np.eye(num_states)  # State cost matrix
     Q = 1000 * np.eye(num_states)
-    Q[num_joints:, num_joints:] = 0.0
+    #Q[num_joints:, num_joints:] = 0.0
     
     R = 0.1 * np.eye(num_controls)  # Control input cost matrix
     
@@ -92,8 +110,9 @@ def main():
     # Initialize data storage
     q_mes_all, qd_mes_all, q_d_all, qd_d_all = [], [], [], []
 
+    damping_coefficients = [0.5, 0.6, 0.2, 0.1, 0.3, 0.35, 0.8]
     # Define the matrices
-    A, B = getSystemMatrices(sim, num_joints)
+    A, B = getSystemMatrices(sim, num_joints, None)
     Q, R = getCostMatrices(num_joints)
     
     # Measuring all the state
@@ -110,13 +129,14 @@ def main():
     H,F = regulator.compute_H_and_F(S_bar, T_bar, Q_bar, R_bar)
     
     # Main control loop
-    episode_duration = 5
+    episode_duration = 1000
     current_time = 0
     time_step = sim.GetTimeStep()
     steps = int(episode_duration/time_step)
     sim.ResetPose()
     # sim.SetSpecificPose([1, 1, 1, 0.4, 0.5, 0.6, 0.7])
     # testing loop
+    a = None
     for i in range(steps):
         # measure current state
         q_mes = sim.GetMotorAngles(0)
@@ -135,7 +155,7 @@ def main():
         cmd.tau_cmd = dyn_cancel(dyn_model, q_mes, qd_mes, u_mpc)
         sim.Step(cmd, "torque")  # Simulation step with torque command
 
-        print(cmd.tau_cmd)
+        #print(cmd.tau_cmd)
         # Exit logic with 'q' key
         keys = sim.GetPyBulletClient().getKeyboardEvents()
         qKey = ord('q')
@@ -151,9 +171,7 @@ def main():
         # time.sleep(0.01)  # Slow down the loop for better visualization
         # get real time
         current_time += time_step
-        print(f"Current time: {current_time}")
-    
-    
+        #print(f"Current time: {current_time}")
     
     # Plotting
     for i in range(num_joints):

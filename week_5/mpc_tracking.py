@@ -8,7 +8,7 @@ from tracker_model import TrackerModel
 def initialize_simulation(conf_file_name):
     """Initialize simulation and dynamic model."""
     cur_dir = os.path.dirname(os.path.abspath(__file__))
-    sim = pb.SimInterface(conf_file_name, conf_file_path_ext=cur_dir)
+    sim = pb.SimInterface(conf_file_name, conf_file_path_ext=cur_dir, use_gui=False)
     
     ext_names = np.expand_dims(np.array(sim.getNameActiveJoints()), axis=0)
     source_names = ["pybullet"]
@@ -173,6 +173,11 @@ def main():
             # here i need to stack the q_d and qd_d
             x_ref.append(np.vstack((q_d.reshape(-1, 1), qd_d.reshape(-1, 1))))
         
+        #for j in range(N_mpc):
+            #q_d, _ = ref.get_values(current_time + j*time_step)  # Only retrieve position
+            # stack only q_d (positions) and ignore velocities
+            #x_ref.append(np.vstack((q_d.reshape(-1, 1), np.zeros_like(q_d.reshape(-1, 1)))))
+        
         x_ref = np.vstack(x_ref).flatten()
         
 
@@ -182,7 +187,8 @@ def main():
         u_mpc += u_star[:num_joints]
        
         # Control command
-        cmd.tau_cmd = dyn_cancel(dyn_model, q_mes, qd_mes, u_mpc)
+        #cmd.tau_cmd = dyn_cancel(dyn_model, q_mes, qd_mes, u_mpc)
+        cmd.tau_cmd = dyn_cancel(dyn_model, q_mes, np.zeros_like(q_mes), u_mpc)
         sim.Step(cmd, "torque")  # Simulation step with torque command
 
         # print(cmd.tau_cmd)
