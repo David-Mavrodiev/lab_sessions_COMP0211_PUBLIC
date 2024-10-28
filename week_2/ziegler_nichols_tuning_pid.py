@@ -68,7 +68,8 @@ def simulate_with_given_pid_values(sim_, kp, joints_id, regulation_displacement=
         # Ensure q_init is within the range of the amplitude
         
         # Control command
-        cmd.tau_cmd = feedback_lin_ctrl(dyn_model, q_mes, qd_mes, q_des, qd_des, kp_vec, kd_vec)  # Zero torque command
+        tau_cmd = feedback_lin_ctrl(dyn_model, q_mes, qd_mes, q_des, qd_des, kp_vec, kd_vec)  # Zero torque command
+        cmd.SetControlCmd(tau_cmd, ["torque"]*7)
         sim_.Step(cmd, "torque")  # Simulation step with torque command
 
         # Exit logic with 'q' key
@@ -128,15 +129,51 @@ def perform_frequency_analysis(data, dt):
 
 
 if __name__ == '__main__':
-    joint_id = 0  # Joint ID to tune
+    joint_id = 0  # Joint ID to tune #第一个关节就是id=0
     regulation_displacement = 1.0  # Displacement from the initial joint position
-    init_gain=1000 
+    init_gain=13
     gain_step=1.5 
-    max_gain=10000 
+    max_gain=20 
     test_duration=20 # in seconds
     
-
     # TODO using simulate_with_given_pid_values() and perform_frequency_analysis() write you code to test different Kp values 
     # for each joint, bring the system to oscillation and compute the the PD parameters using the Ziegler-Nichols method
+
+    Ku = None  # 存储最终的Ku值
+    Tu = None  # 存储最终的振荡周期
+    # Ku_temp = None # 临时存储Ku 用于对比是否持续震荡
+
+    # TODO 之后对于每个关节 添加一个while循环对joint_id进行修改 记得修改Ku Tu的存储方式
+    # q_mes_all = simulate_with_given_pid_values(sim, kp_0, joint_id, regulation_displacement)
+    for Kp in np.arange(init_gain, max_gain, gain_step):
+        print(f"Testing Kp = {Kp}")
+        q_mes_all = simulate_with_given_pid_values(sim, Kp, joint_id, regulation_displacement, test_duration)
+
+        # 进行频率分析，查看是否出现持续振荡
+        dt = sim.GetTimeStep()
+        frequencies, power = perform_frequency_analysis(q_mes_all, dt)
+
+        # TODO 手工检查 如果震荡 则按某个按钮退出当前的循环 并记录当前Kp ku Tu 用于计算 Ku = Kp、Tu = 1 / dominant_frequency
+        user_input = input("检测到震荡？按 'y' 记录当前 Kp 为 Ku 并退出循环，按其他键继续测试：")
+    
+        if user_input.lower() == 'y':
+            dominant_frequency_index = np.argmax(power) # !!!!这里获取的时候会出问题！！！获取是为了计算Tu
+            dominant_frequency = frequencies[np.argmax(power)] # 获取震荡周期
+            # 记录Pu
+            Tu = 1 / dominant_frequency  # 计算振荡周期
+            # 记录Ku
+            Ku = Kp
+            break
+
+    # TODO 将当前的Pu和Ku存在数组里
+    
+    
+    if Ku is not None and Tu is not None: # 条件改为Ku和Tu都为7个值
+        Kp_final = 0.6 * Ku
+        Kd_final = 0.125 * Ku * Tu
+        print(f"Final Kp: {Kp_final}, Final Kd: {Kd_final}")
+
+        # 使用最终的PD增益进行仿真
+        simulate_with_given_pid_values(sim, Kp_final, joint_id, regulation_displacement, test_duration, plot=True)
 
    

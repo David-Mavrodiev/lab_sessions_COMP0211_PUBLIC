@@ -165,7 +165,7 @@ def main():
         
         x0_mpc = np.vstack((q_mes, qd_mes))
         x0_mpc = x0_mpc.flatten()
-        x_ref = []
+        x_ref = [] # 该变量是用来存储预测轨迹的 即之前说的reference trajectory, r(t)
         # generate the predictive trajectory for N steps
         for j in range(N_mpc):
             q_d, qd_d = ref.get_values(current_time + j*time_step)
@@ -175,14 +175,18 @@ def main():
         
         x_ref = np.vstack(x_ref).flatten()
         
+        # print(x_ref.shape)
+        # print(x0_mpc.shape)
+        # print(u_mpc.shape)
 
         # Compute the optimal control sequence
-        u_star = tracker.computesolution(x_ref,x0_mpc,u_mpc, H, Ftra)
+        u_star = tracker.computesolution(x_ref,x0_mpc,u_mpc, H, Ftra) # 还是只用了x0_mpc 即第一个关节的状态作为输入来预测
         # Return the optimal control sequence
         u_mpc += u_star[:num_joints]
        
         # Control command
-        cmd.tau_cmd = dyn_cancel(dyn_model, q_mes, qd_mes, u_mpc)
+        tau_cmd = dyn_cancel(dyn_model, q_mes, qd_mes, u_mpc)
+        cmd.SetControlCmd(tau_cmd, ["torque"]*7)
         sim.Step(cmd, "torque")  # Simulation step with torque command
 
         # print(cmd.tau_cmd)

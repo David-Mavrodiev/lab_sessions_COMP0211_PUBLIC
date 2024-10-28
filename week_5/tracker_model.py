@@ -6,8 +6,8 @@ class TrackerModel:
         A_cont = A_continuos
         B_cont = B_continuos
         C_cont = C_continuos
-        self.Q = Q
-        self.R = R
+        self.Q = Q # state cost matrix
+        self.R = R # control input cost matrix
         self.N = N # prediction horizon
         self.q = q # number of outputs  
         self.m = m # Number of control inputs
@@ -48,6 +48,10 @@ class TrackerModel:
         # Compute F_tra
         first = -Q_hat @ S_bar
         second = T_bar.T @ Q_bar @ S_bar
+        # T_bar和S_bar是Kmpc里的参数
+        # Kmpc = -(R+StQS)^-1 StQ F
+        # T_bar 是F
+        # S_bar 是S
         F_tra = np.vstack([first, second])  # Stack first and second vertically
         
         return H, F_tra
@@ -101,9 +105,16 @@ class TrackerModel:
     
 
     
+    # F_tra是cost function里的线性项 即后面那部分
+    # [x_ref, x_cur, u_cur]是二次项 即前面那部分
 
     def computesolution(self,x_ref, x_cur, u_cur, H, F_tra):
-        F = np.dot(np.hstack([x_ref, x_cur, u_cur]), F_tra)
+        F = np.dot(np.hstack([x_ref, x_cur, u_cur]), F_tra) # 目前有个bug F_tra的竖直方向的维度不对 与前面的不匹配 现在是154*70
+        # 70是 7个关节 预测10步 7*10=70
+        # 154是 ？？？？为什么少了7？
+        # 理论上 前面那一串是161 x_ref为140（7*10*2）x_cur是14 u_cur是7 140+14+7=161
+        # 说是A矩阵的问题 A直接复制到week3的A，后面的计算过程也直接复制的 
+        # 但是因为这是个tracking问题 所以这里的A的计算和之前的应该不一样 应该改后面的A的计算过程 （定义貌似不用改）
 
         def objective(x, H, F):
             # Objective function: 0.5 * x^T * H * x + f^T * x
