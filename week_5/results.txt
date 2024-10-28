@@ -1,0 +1,3 @@
+Elapsed time for P_w = 1000, V_w = 1: 15.97 seconds
+Elapsed time for P_w = 10000, V_w = 10: 18.62 seconds
+Elapsed time for P_w = 100000, V_w = 100: 25.12 seconds

@@ -4,7 +4,7 @@ import os
 import matplotlib.pyplot as plt
 from simulation_and_control import pb, MotorCommands, PinWrapper, feedback_lin_ctrl, dyn_cancel, SinusoidalReference, CartesianDiffKin
 from tracker_model import TrackerModel
-from PolynomialReference import PolynomialReference
+from LinearReference import LinearReference
 
 def initialize_simulation(conf_file_name):
     """Initialize simulation and dynamic model."""
@@ -121,9 +121,9 @@ def main():
     # Define the matrices
     A, B = getSystemMatrices(sim, num_joints)
 
-    p_ws = [1000, 10000, 100000]
-    v_ws = [1, 10, 100]
-    colors = ['y', 'g', 'b']
+    p_ws = [10000, 10000, 100000] # To track position only, set p_w to 10000000
+    v_ws = [100, 10, 100] # To track position only, set v_w to 0
+    colors = ['C0', 'g', 'b']
     results = {}
 
     # Sinusoidal reference
@@ -135,14 +135,17 @@ def main():
     # Convert lists to NumPy arrays for easier manipulation in computations
     amplitude = np.array(amplitudes)
     frequency = np.array(frequencies)
-    ref = SinusoidalReference(amplitude, frequency, sim.GetInitMotorAngles())  # Initialize the reference
-    # ref = PolynomialReference(sim.GetInitMotorAngles(), degree=1)  # Initialize the reference
+    # ref = SinusoidalReference(amplitude, frequency, sim.GetInitMotorAngles())  # Initialize the reference
+    max_pos = sim.GetBotJointsLimit()[1] # Maximum joint position limits
+    ref = LinearReference(sim.GetInitMotorAngles(), max_pos)  # Initialize the linear reference
+
+    # f = open(f"week_5/results.txt", "a")
 
     for p_w, v_w in zip(p_ws, v_ws):
         q_mes_all, qd_mes_all, q_d_all, qd_d_all = [], [], [], []
 
         Q, R = getCostMatrices(num_joints, p_w, v_w)
-        # Q, R = getCostMatrices(num_joints)
+        # Q, R = getCostMatrices(num_joints) # Default values
     
         # Measuring all the state
         num_states = 2 * num_joints
@@ -161,6 +164,7 @@ def main():
         # Main control loop
         episode_duration = 5 # duration in seconds
         current_time = 0
+        start_time = time.time()
         time_step = sim.GetTimeStep()
         steps = int(episode_duration/time_step)
         sim.ResetPose()
@@ -182,7 +186,6 @@ def main():
             for j in range(N_mpc):
                 q_d, qd_d = ref.get_values(current_time + j*time_step)
                 # here i need to stack the q_d and qd_d
-                # qd_d = np.zeros_like(qd_d)  # To track only the position
                 x_ref.append(np.vstack((q_d.reshape(-1, 1), qd_d.reshape(-1, 1))))
             
             x_ref = np.vstack(x_ref).flatten()
@@ -193,7 +196,8 @@ def main():
             u_mpc += u_star[:num_joints]
             
             # Control command
-            cmd.tau_cmd = dyn_cancel(dyn_model, q_mes, qd_mes, u_mpc)
+            tau_cmd = dyn_cancel(dyn_model, q_mes, qd_mes, u_mpc)  # Zero torque command
+            cmd.SetControlCmd(tau_cmd, ["torque"]*7) 
             sim.Step(cmd, "torque")  # Simulation step with torque command
 
             # print(cmd.tau_cmd)
@@ -220,64 +224,66 @@ def main():
             print(f"Time: {current_time}")
 
         results[(p_w, v_w)] = (q_mes_all, qd_mes_all)
+        break
+        # f.write(f"Elapsed time for P_w = {p_w}, V_w = {v_w}: {time.time() - start_time:.2f} seconds")
+        
         
     
     
-    # for i in range(num_joints):
-    #     plt.figure(figsize=(10, 8))
-        
-    #     # Position plot for joint i
-    #     plt.subplot(2, 1, 1)
-    #     for idx, (p_w, v_w) in enumerate(results.keys()):
-    #         plt.plot([q[i] for q in results[(p_w, v_w)][0]], label=f'Measured Position - P_w = {p_w}', color=colors[idx])
-    #     plt.plot([q[i] for q in q_d_all], label=f'Desired Position', linestyle='--', color='orange')
-    #     plt.title(f'Position Tracking for Joint {i+1}')
-    #     plt.xlabel('Time steps')
-    #     plt.ylabel('Position')
-    #     plt.legend()
-
-    #     # Velocity plot for joint i
-    #     plt.subplot(2, 1, 2)
-    #     for idx, (p_w, v_w) in enumerate(results.keys()):
-    #         plt.plot([qd[i] for qd in results[(p_w, v_w)][1]], label=f'Measured Velocity - V_w = {v_w}', color=colors[idx])
-    #     plt.plot([qd[i] for qd in qd_d_all], label=f'Desired Velocity - V_w', linestyle='--', color='orange')
-    #     plt.title(f'Velocity Tracking for Joint {i+1}')
-    #     plt.xlabel('Time steps')
-    #     plt.ylabel('Velocity')
-    #     plt.legend()
-
-    #     plt.tight_layout()
-    #     plt.show()
-    #     # plt.savefig(f'/Users/joefarah/Desktop/Figures/E&C_Lab3/joint_{i+1}_tracking_pos_only.png', dpi=300)
-    # fig, axes = plt.subplots(num_joints, 2, figsize=(12, num_joints * 4))
-
-    fig, axes = plt.subplots(num_joints, 2, figsize=(14, num_joints * 3))  
-
     for i in range(num_joints):
+        plt.figure(figsize=(10, 8))
+        
         # Position plot for joint i
-        ax_pos = axes[i, 0]
+        plt.subplot(2, 1, 1)
         for idx, (p_w, v_w) in enumerate(results.keys()):
-            ax_pos.plot([q[i] for q in results[(p_w, v_w)][0]], label=f'Measured Position - P_w = {p_w}', color=colors[idx])
-        ax_pos.plot([q[i] for q in q_d_all], label='Desired Position', linestyle='--', color='orange')
-        ax_pos.set_title(f'Joint {i+1}', fontsize=10)
-        ax_pos.set_xlabel('Time steps', fontsize=8)
-        ax_pos.set_ylabel('Position', fontsize=8)
-        ax_pos.legend(fontsize=6, loc='upper right')
+            plt.plot([q[i] for q in results[(p_w, v_w)][0]], label=rf'Measured Position - $P_w = {p_w}$', color=colors[idx])
+        plt.plot([q[i] for q in q_d_all], label=f'Desired Position', linestyle='--', color='orange')
+        plt.title(f'Position Tracking for Joint {i+1}')
+        plt.xlabel('Time steps')
+        plt.ylabel('Position')
+        plt.legend()
 
         # Velocity plot for joint i
-        ax_vel = axes[i, 1]
+        plt.subplot(2, 1, 2)
         for idx, (p_w, v_w) in enumerate(results.keys()):
-            ax_vel.plot([qd[i] for qd in results[(p_w, v_w)][1]], label=f'Measured Velocity - V_w = {v_w}', color=colors[idx])
-        ax_vel.plot([qd[i] for qd in qd_d_all], label='Desired Velocity', linestyle='--', color='orange')
-        ax_vel.set_title(f'Joint {i+1}', fontsize=10)
-        ax_vel.set_xlabel('Time steps', fontsize=8)
-        ax_vel.set_ylabel('Velocity', fontsize=8)
-        ax_vel.legend(fontsize=6, loc='upper right')
+            plt.plot([qd[i] for qd in results[(p_w, v_w)][1]], label=rf'Measured Velocity - $V_w = {v_w}$', color=colors[idx])
+        plt.plot([qd[i] for qd in qd_d_all], label=f'Desired Velocity', linestyle='--', color='orange')
+        plt.title(f'Velocity Tracking for Joint {i+1}')
+        plt.xlabel('Time steps')
+        plt.ylabel('Velocity')
+        plt.legend()
 
-    # Adjust layout
-    plt.tight_layout(pad=2.0)
-    plt.savefig('/Users/joefarah/Desktop/Figures/E&C_Lab3/tracking.png', dpi=300)  # Specify the path to save the figure
-    plt.show()
+        plt.tight_layout()
+        plt.savefig(f'/Users/joefarah/Desktop/Figures/E&C_Lab3/joint_{i+1}_tracking_linear.png', dpi=300)
+        # plt.show()
+
+    # fig, axes = plt.subplots(num_joints, 2, figsize=(14, num_joints * 3))  
+
+    # for i in range(num_joints):
+    #     # Position plot for joint i
+    #     ax_pos = axes[i, 0]
+    #     for idx, (p_w, v_w) in enumerate(results.keys()):
+    #         ax_pos.plot([q[i] for q in results[(p_w, v_w)][0]], label=rf'Measured Position - $P_w = {p_w}$', color=colors[idx])
+    #     ax_pos.plot([q[i] for q in q_d_all], label='Desired Position', linestyle='--', color='orange')
+    #     ax_pos.set_title(f'Joint {i+1}', fontsize=10)
+    #     ax_pos.set_xlabel('Time steps', fontsize=8)
+    #     ax_pos.set_ylabel('Position', fontsize=8)
+    #     ax_pos.legend(fontsize=6, loc='upper right')
+
+    #     # Velocity plot for joint i
+    #     ax_vel = axes[i, 1]
+    #     for idx, (p_w, v_w) in enumerate(results.keys()):
+    #         ax_vel.plot([qd[i] for qd in results[(p_w, v_w)][1]], label=f'Measured Velocity - V_w = {v_w}', color=colors[idx])
+    #     ax_vel.plot([qd[i] for qd in qd_d_all], label='Desired Velocity', linestyle='--', color='orange')
+    #     ax_vel.set_title(f'Joint {i+1}', fontsize=10)
+    #     ax_vel.set_xlabel('Time steps', fontsize=8)
+    #     ax_vel.set_ylabel('Velocity', fontsize=8)
+    #     ax_vel.legend(fontsize=6, loc='upper right')
+
+    # # Adjust layout
+    # plt.tight_layout(pad=2.0)
+    # # plt.savefig('/Users/joefarah/Desktop/Figures/E&C_Lab3/tracking.png', dpi=300)  # Specify the path to save the figure
+    # plt.show()
      
     
     

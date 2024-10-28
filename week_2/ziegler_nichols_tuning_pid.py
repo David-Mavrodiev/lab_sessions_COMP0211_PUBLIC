@@ -68,7 +68,8 @@ def simulate_with_given_pid_values(sim_, kp, joints_id, regulation_displacement=
         # Ensure q_init is within the range of the amplitude
         
         # Control command
-        cmd.tau_cmd = feedback_lin_ctrl(dyn_model, q_mes, qd_mes, q_des, qd_des, kp, kd)  # Zero torque command
+        tau_cmd = feedback_lin_ctrl(dyn_model, q_mes, qd_mes, q_des, qd_des, kp, kd)  # Zero torque command
+        cmd.SetControlCmd(tau_cmd, ["torque"]*7)  # Set the computed torque command
         sim_.Step(cmd, "torque")  # Simulation step with torque command
 
         # Exit logic with 'q' key
