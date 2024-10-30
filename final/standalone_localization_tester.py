@@ -83,6 +83,27 @@ class Simulator(object):
 
         y = np.array(y)
         return y
+    
+    def landmark_range_bearing_observations(self):
+        y = []
+        W_range = self._filter_config.W_range
+        W_bearing = self._filter_config.W_bearing
+        for lm in self._map.landmarks:
+            dx = lm[0] - self._x_true[0]
+            dy = lm[1] - self._x_true[1]
+            range_true = np.sqrt(dx**2 + dy**2)
+            bearing_true = np.arctan2(dy, dx) - self._x_true[2]
+            bearing_true = np.arctan2(np.sin(bearing_true), np.cos(bearing_true))  # Angle wrapping
+
+            # Add noise to measurements
+            range_meas = range_true + np.random.normal(0, np.sqrt(W_range))
+            bearing_meas = bearing_true + np.random.normal(0, np.sqrt(W_bearing))
+            bearing_meas = np.arctan2(np.sin(bearing_meas), np.cos(bearing_meas))  # Angle wrapping
+
+            y.append([range_meas, bearing_meas])
+        y = np.array(y)
+        return y
+
 
     def x_true(self):
         return self._x_true
@@ -138,10 +159,12 @@ for step in range(sim_config.time_steps):
     estimator.predict_to(simulation_time)
 
     # Get the landmark observations.
-    y = simulator.landmark_range_observations()
+    #y = simulator.landmark_range_observations()
+    y = simulator.landmark_range_bearing_observations()
 
     # Update the filter with the latest observations.
-    estimator.update_from_landmark_range_observations(y)
+    #estimator.update_from_landmark_range_observations(y)
+    estimator.update_from_landmark_range_bearing_observations(y)
 
     # Get the current state estimate.
     x_est, Sigma_est = estimator.estimate()
