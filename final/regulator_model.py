@@ -7,10 +7,15 @@ class RegulatorModel:
         self.C = None
         self.Q = None
         self.R = None
+        self.P = None
         self.N = N
         self.q = q #  output dimension
         self.m = m #  input dimension
         self.n = n #  state dimension
+
+    # 添加terminal cost
+    def setTerminalCost(self, P):
+        self.P = P
 
     def compute_H_and_F(self, S_bar, T_bar, Q_bar, R_bar):
         # Compute H
@@ -18,6 +23,11 @@ class RegulatorModel:
 
         # Compute F
         F = np.dot(S_bar.T, np.dot(Q_bar, T_bar))
+
+        # # 考虑terminal cost
+        # if self.P is not None:
+        #     H += np.dot(T_bar.T, np.dot(self.P, T_bar))
+        #     F += np.dot(T_bar.T, self.P)
 
         return H, F
 
@@ -61,18 +71,18 @@ class RegulatorModel:
                 "Hint: Use the goal state (e.g., zeros) and zero control input at the beginning.\n"
                 "Also, ensure that you implement the linearization logic in the updateSystemMatrices function."
             )
-
+        
         A =[]
         B = []
         num_states = self.n
         num_controls = self.m
         num_outputs = self.q
         delta_t = sim.GetTimeStep()
-        v0 = cur_x[0]
+        v0 = cur_u[0]
         theta0 = cur_x[2]
         # get A and B matrices by linearinzing the cotinuous system dynamics
         # The linearized continuous-time system is:
-
+        
         # \[
         # \dot{\mathbf{x}} = A_c (\mathbf{x} - \mathbf{x}_0) + B_c (\mathbf{u} - \mathbf{u}_0).
         # \]
@@ -167,7 +177,19 @@ class RegulatorModel:
         
         #updating the state and control input matrices
        
+        # 计算 A 矩阵
+        A = np.array([
+            [1, 0, -v0 * delta_t * np.sin(theta0)],
+            [0, 1,  v0 * delta_t * np.cos(theta0)],
+            [0, 0, 1]
+        ])
 
+        # 计算 B 矩阵
+        B = np.array([
+            [delta_t * np.cos(theta0), 0],
+            [delta_t * np.sin(theta0), 0],
+            [0, delta_t]
+        ])
 
         self.A = A
         self.B = B

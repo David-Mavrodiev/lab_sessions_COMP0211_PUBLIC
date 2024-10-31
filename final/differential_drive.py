@@ -6,6 +6,7 @@ from simulation_and_control import pb, MotorCommands, PinWrapper, feedback_lin_c
 from simulation_and_control import differential_drive_regulation_controller,regulation_polar_coordinates,regulation_polar_coordinate_quat,wrap_angle,velocity_to_wheel_angular_velocity
 import pinocchio as pin
 from regulator_model import RegulatorModel
+from scipy.linalg import solve_discrete_are
 
 # global variables
 W_range = 0.5 ** 2  # Measurement noise variance (range measurements)
@@ -73,7 +74,6 @@ def main():
     # getting time step
     time_step = sim.GetTimeStep()
     current_time = 0
-
    
     # Initialize data storage
     base_pos_all, base_bearing_all = [], []#
@@ -82,34 +82,47 @@ def main():
      # Define the matrices
     num_states = 3
     num_controls = 2
-   
     
     # Measuring all the state
-    
     C = np.eye(num_states)
     
     # Horizon length
+    # N长度 若太长则加terminal cost P
     N_mpc = 10
-
     # Initialize the regulator model
     regulator = RegulatorModel(N_mpc, num_states, num_controls, num_states)
+    
     # update A,B,C matrices
     # TODO provide state_x_for_linearization,cur_u_for_linearization to linearize the system
     # you can linearize around the final state and control of the robot (everything zero)
     # or you can linearize around the current state and control of the robot
     # in the second case case you need to update the matrices A and B at each time step
     # and recall everytime the method updateSystemMatrices
+
+    # 初始化的位置
     init_pos  = np.array([2.0, 3.0])
     init_quat = np.array([0,0,0.3827,0.9239])
-    init_base_bearing_ = quaternion2bearing(init_quat[3], init_quat[0], init_quat[1], init_quat[2])
+    init_base_bearing_ = quaternion2bearing(init_quat[3], init_quat[0], init_quat[1], init_quat[2]) # rb rf lf lb
+    # 目标位置 goal position
+    # for terminate the simulation only 
+    goal_state = np.array([0, 0, 0]) # [x,y,theta]
+    position_tolerance = 0.3  # 位置容差
+    orientation_tolerance = 0.3  # 角度容差
+
+    # 第一次的时候线性化AB
     cur_state_x_for_linearization = [init_pos[0], init_pos[1], init_base_bearing_]
     cur_u_for_linearization = np.zeros(num_controls)
     regulator.updateSystemMatrices(sim,cur_state_x_for_linearization,cur_u_for_linearization)
     # Define the cost matrices
-    Qcoeff = np.array([310, 310, 80.0])
+    # 此处设置Q和R矩阵 Q（状态）越大 动的越猛 R（输入）越大 动的越平滑
+    Qcoeff = np.array([310, 320, 310]) # [x, y, theta]
     Rcoeff = 0.5
     regulator.setCostMatrices(Qcoeff,Rcoeff)
    
+    # 定义terminal cost P
+    Pcoeef = 1
+    P = Pcoeef * solve_discrete_are(regulator.A, regulator.B, regulator.Q, regulator.R)
+    regulator.setTerminalCost(P)
 
     u_mpc = np.zeros(num_controls)
 
@@ -126,15 +139,12 @@ def main():
     cmd.SetControlCmd(init_angular_wheels_velocity_cmd, init_interface_all_wheels)
     
     while True:
-
-
         # True state propagation (with process noise)
         ##### advance simulation ##################################################################
         sim.Step(cmd, "torque")
         time_step = sim.GetTimeStep()
 
         # Kalman filter prediction
-       
     
         # Get the measurements from the simulator ###########################################
          # measurements of the robot without noise (just for comparison purpose) #############
@@ -150,21 +160,20 @@ def main():
         y = landmark_range_observations(base_pos)
     
         # Update the filter with the latest observations
-        
     
         # Get the current state estimate
-        
 
         # Figure out what the controller should do next
         # MPC section/ low level controller section ##################################################################
-       
    
         # Compute the matrices needed for MPC optimization
         # TODO here you want to update the matrices A and B at each time step if you want to linearize around the current points
         # add this 3 lines if you want to update the A and B matrices at each time step 
-        #cur_state_x_for_linearization = [base_pos[0], base_pos[1], base_bearing_]
-        #cur_u_for_linearization = u_mpc
-        #regulator.updateSystemMatrices(sim,cur_state_x_for_linearization,cur_u_for_linearization)
+        # 此处更新A和B矩阵，线性化当前点，因为实际是非线性的 每次都要更新
+        cur_state_x_for_linearization = [base_pos[0], base_pos[1], base_bearing_]
+        cur_u_for_linearization = u_mpc
+        regulator.updateSystemMatrices(sim,cur_state_x_for_linearization,cur_u_for_linearization)
+
         S_bar, T_bar, Q_bar, R_bar = regulator.propagation_model_regulator_fixed_std()
         H,F = regulator.compute_H_and_F(S_bar, T_bar, Q_bar, R_bar)
         x0_mpc = np.hstack((base_pos[:2], base_bearing_))
@@ -176,10 +185,17 @@ def main():
         u_mpc = u_mpc[0:num_controls] 
         # Prepare control command to send to the low level controller
         left_wheel_velocity,right_wheel_velocity=velocity_to_wheel_angular_velocity(u_mpc[0],u_mpc[1], wheel_base_width, wheel_radius)
-        angular_wheels_velocity_cmd = np.array([right_wheel_velocity, left_wheel_velocity, left_wheel_velocity, right_wheel_velocity])
+        angular_wheels_velocity_cmd = np.array([right_wheel_velocity, left_wheel_velocity, left_wheel_velocity, right_wheel_velocity]) # 原为r l l r 试试改为r r l l
         interface_all_wheels = ["velocity", "velocity", "velocity", "velocity"]
         cmd.SetControlCmd(angular_wheels_velocity_cmd, interface_all_wheels)
 
+        # 检查当前位置与目标位置的误差
+        pos_error = np.linalg.norm(base_pos[:2] - goal_state[:2])
+        theta_error = wrap_angle(base_bearing_ - goal_state[2])
+        # 如果误差小于容差，则停止
+        if pos_error < position_tolerance and np.abs(theta_error) < orientation_tolerance:
+            print("Goal reached!")
+            break
 
         # Exit logic with 'q' key (unchanged)
         keys = sim.GetPyBulletClient().getKeyboardEvents()
@@ -189,7 +205,7 @@ def main():
         
 
         # Store data for plotting if necessary
-        base_pos_all.append(base_pos)
+        base_pos_all.append(base_pos[:2])
         base_bearing_all.append(base_bearing_)
 
         # Update current time
@@ -198,7 +214,32 @@ def main():
 
     # Plotting 
     #add visualization of final x, y, trajectory and theta
-    
+    base_pos_all = np.array(base_pos_all)  # [[x1, y1], [x2, y2], ...]
+    base_bearing_all = np.array(base_bearing_all)  # [theta1, theta2, ...]
+    # 创建绘图
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+
+    # 绘制 x 和 y 的轨迹
+    ax1.plot(base_pos_all[:, 0], base_pos_all[:, 1], label='Trajectory', color='blue')
+    ax1.scatter(base_pos_all[-1, 0], base_pos_all[-1, 1], color='blue', label='Final Position')  # 终点标记
+    ax1.scatter(goal_state[0], goal_state[1], color='red', label='Goal Position')  # 目标点标记
+    ax1.legend()
+    ax1.set_xlabel('X Position (m)')
+    ax1.set_ylabel('Y Position (m)')
+    ax1.set_title('Robot Trajectory')
+    ax1.grid()
+    ax1.axis('equal')  # 保持x和y轴比例相同
+
+    # 绘制 theta 的变化图
+    ax2.plot(np.arange(len(base_bearing_all)) * time_step, base_bearing_all, label='Theta', color='green')
+    ax2.set_xlabel('Time (s)')
+    ax2.set_ylabel('Theta (rad)')
+    ax2.set_title('Theta Change')
+    ax2.grid()
+
+    # 显示绘图
+    plt.tight_layout()
+    plt.show()
     
     
     
