@@ -3,7 +3,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from robot_localization_system import FilterConfiguration, Map, RobotEstimator
+from robot_localization_system import FilterConfiguration, Map, Map_self, RobotEstimator
 
 # Simulator configuration; this only contains
 # stuff relevant for the standalone simulator.
@@ -83,6 +83,40 @@ class Simulator(object):
 
         y = np.array(y)
         return y
+    
+    # 不仅测量range 还测量bearing
+    # x: (3,1)
+    # y: (2N,1) N为landmark的数量
+    # sigmaXZ: (3,2N)
+    # sigmaZZ: (2N,2N) 
+    # K: (3,2N) Kalman增益
+    # C: (2N,3) observation Jacobian
+    # w: (2N,2N) noise measure
+    # v: (2N,1) noise update
+    def landmark_range_bearing_observations(self):
+        y = []
+        W_range = self._filter_config.W_range
+        W_bearing = self._filter_config.W_bearing  # 方位角的测量噪声
+        
+        for lm in self._map.landmarks:
+            dx = lm[0] - self._x_true[0]
+            dy = lm[1] - self._x_true[1]
+            
+            # 计算真实的距离和方位角
+            range_true = np.sqrt(dx**2 + dy**2)
+            bearing_true = np.arctan2(dy, dx) - self._x_true[2]
+            bearing_true = np.arctan2(np.sin(bearing_true), np.cos(bearing_true))  # Angle wrapping
+
+            # 加入噪声
+            range_meas = range_true + np.random.normal(0, np.sqrt(W_range))
+            bearing_meas = bearing_true + np.random.normal(0, np.sqrt(W_bearing))
+
+            y.extend([range_meas, bearing_meas])
+
+        y = np.array(y)
+        # print("y的维度，应为2N*1（此处N为3），应为6*1", y.shape)
+        return y
+
 
     def x_true(self):
         return self._x_true
@@ -91,7 +125,8 @@ class Simulator(object):
 # Create the simulator configuration.
 sim_config = SimulatorConfiguration()
 
-# Create the filter configuration. If you want
+# Create the filter configuration. If     
+# you want
 # to investigate mis-tuning the filter,
 # create a different filter configuration for
 # the simulator and for the filter, and
@@ -99,7 +134,8 @@ sim_config = SimulatorConfiguration()
 filter_config = FilterConfiguration()
 
 # Create the map object for the landmarks.
-map = Map()
+# map = Map()
+map = Map_self()
 
 # Create the controller. This just provides
 # fixed control inputs for now.
@@ -138,10 +174,12 @@ for step in range(sim_config.time_steps):
     estimator.predict_to(simulation_time)
 
     # Get the landmark observations.
-    y = simulator.landmark_range_observations()
+    # y = simulator.landmark_range_observations()
+    y = simulator.landmark_range_bearing_observations()
 
     # Update the filter with the latest observations.
-    estimator.update_from_landmark_range_observations(y)
+    # estimator.update_from_landmark_range_observations(y)
+    estimator.update_from_landmark_range_bearing_observations(y)
 
     # Get the current state estimate.
     x_est, Sigma_est = estimator.estimate()
@@ -177,7 +215,9 @@ plt.show()
 # wrapping". This small helper function is used
 # to address the issue.
 
-
+# 报告里写，这个wrap_angle的作用
+# 该函数的作用是将角度限制在-pi到pi之间 3pi -> pi
+# 否则角度会出现跳变 导致误差很大 
 def wrap_angle(angle): return np.arctan2(np.sin(angle), np.cos(angle))
 
 
@@ -191,5 +231,8 @@ for s in range(3):
     plt.plot(estimation_error[:, s])
     plt.plot(two_sigma, linestyle='dashed', color='red')
     plt.plot(-two_sigma, linestyle='dashed', color='red')
+    if s < 2:
+        plt.plot(np.zeros_like(estimation_error[:, s]) + 0.1, linestyle='dashed', color='lightgreen')
+        plt.plot(np.zeros_like(estimation_error[:, s]) - 0.1, linestyle='dashed', color='lightgreen')
     plt.title(state_name[s])
     plt.show()

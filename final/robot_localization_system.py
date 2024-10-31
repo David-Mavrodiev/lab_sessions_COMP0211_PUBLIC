@@ -9,6 +9,8 @@ class FilterConfiguration(object):
         # Process and measurement noise covariance matrices
         self.V = np.diag([0.1, 0.1, 0.05]) ** 2  # Process noise covariance
         # Measurement noise variance (range measurements)
+        # 注！ 此处更新测量噪声的方差
+        # 方差越小，越信任观测值，反之，越相信预测值
         self.W_range = 0.5 ** 2
         self.W_bearing = (np.pi * 0.5 / 180.0) ** 2
 
@@ -16,7 +18,8 @@ class FilterConfiguration(object):
         self.x0 = np.array([2.0, 3.0, np.pi / 4])
         self.Sigma0 = np.diag([1.0, 1.0, 0.5]) ** 2
 
-
+# Landmark 地标
+# 用于机器人测量自身位置
 class Map(object):
     def __init__(self):
         self.landmarks = np.array([
@@ -24,6 +27,25 @@ class Map(object):
             [15, 5],
             [10, 15]
         ])
+
+# 自定义的map类 生成更多的landmarks
+class Map_self(object):
+    def __init__(self):
+        grid_spacing = 5
+        landmarks = []
+
+        # 30*30 36
+        for x in range(-15, 15, grid_spacing):
+            for y in range(-15, 15, grid_spacing):
+                landmarks.append([x, y])
+
+        # # 50*50 100
+        # for x in range(-25, 25, grid_spacing):
+        #     for y in range(-25, 25, grid_spacing):
+        #         landmarks.append([x, y])
+        
+        # 将地标列表转换为 NumPy 数组
+        self.landmarks = np.array(landmarks)
 
 
 class RobotEstimator(object):
@@ -106,7 +128,7 @@ class RobotEstimator(object):
         SigmaZZ = C @ SigmaXZ + W
         K = SigmaXZ @ np.linalg.inv(SigmaZZ)
 
-        # State update
+        # 状态更新update
         self._x_est = self._x_pred + K @ nu
 
         # Covariance update
@@ -150,3 +172,66 @@ class RobotEstimator(object):
         # Angle wrap afterwards
         self._x_est[-1] = np.arctan2(np.sin(self._x_est[-1]),
                                      np.cos(self._x_est[-1]))
+    
+    def update_from_landmark_range_bearing_observations(self, y_range_bearing):
+            def wrap_angle(angle): return np.arctan2(np.sin(angle), np.cos(angle))
+            
+            y_pred = []
+            C = []
+            x_pred = self._x_pred
+            
+            for lm in self._map.landmarks:
+                dx_pred = lm[0] - x_pred[0]
+                dy_pred = lm[1] - x_pred[1]
+                
+                # 计算预测的距离和方位角
+                range_pred = np.sqrt(dx_pred**2 + dy_pred**2)
+                bearing_pred = np.arctan2(dy_pred, dx_pred) - x_pred[2]
+                bearing_pred = wrap_angle(bearing_pred) # wrap angle!
+
+                # 预测的测量值
+                y_pred.extend([range_pred, bearing_pred])
+
+                # 距离的雅可比矩阵
+                C_range = np.array([
+                    -(dx_pred) / range_pred,
+                    -(dy_pred) / range_pred,
+                    0
+                ])
+                
+                # 方位角的雅可比矩阵
+                C_bearing = np.array([
+                    dy_pred / (range_pred ** 2),
+                    -dx_pred / (range_pred ** 2),
+                    -1
+                ])
+                C.append(C_range)
+                C.append(C_bearing)
+
+            C = np.array(C).reshape(-1, 3)
+            y_pred = np.array(y_pred).reshape(-1)
+        
+            # 计算innovation
+            nu = (y_range_bearing - y_pred).reshape(-1)
+            for i in range(1, len(nu), 2):
+                nu[i] = wrap_angle(nu[i]) # wrap angle!
+
+            # Observation noise cov W
+            # range, range, range,..., bearing, bearing, bearing ！！！！！BAD！！！！！
+            # num_landmarks = len(self._map.landmarks)
+            # # 距离噪声矩阵，(N, N)，
+            # W_range_matrix = self._config.W_range * np.eye(num_landmarks)
+            # # 方位角噪声矩阵，(N, N)
+            # W_bearing_matrix = self._config.W_bearing * np.eye(num_landmarks)
+            # W = np.block([
+            #     [W_range_matrix, np.zeros((num_landmarks, num_landmarks))],
+            #     [np.zeros((num_landmarks, num_landmarks)), W_bearing_matrix]
+            # ])
+            
+            # range, bearing; range, bearing; range, bearing;...
+            W = np.diag([self._config.W_range, self._config.W_bearing] * len(self._map.landmarks))
+            # print(W.shape)
+
+            # 更新 EKF 状态
+            self._do_kf_update(nu, C, W)
+            self._x_est[-1] = wrap_angle(self._x_est[-1]) # wrap angle
