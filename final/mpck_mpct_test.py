@@ -113,7 +113,7 @@ if __name__ == "__main__":
     pos_all_kf, bearing_all_kf = [], []
     starts, goals = [], []
     results = {"MPCT": [], "MPCK": []}
-    time  = np.arange(0, 5.001, 0.001)
+    time  = np.arange(0.001, 5.001, 0.001)
 
     # Run each test for MPCT and MPCK with noise
     for name, test in tests.items():
@@ -141,56 +141,82 @@ if __name__ == "__main__":
     pos_all_gt = np.array(pos_all_gt)
     pos_all_kf = np.array(pos_all_kf)
     goals = np.array(goals)
+    starts = np.array(starts)
 
-    fig, axes = plt.subplots(num_rows, 2, figsize=(12, 4 * num_rows))
-    fig.suptitle("MPCT and MPCK Test Position Results", fontsize=16)
+    # fig, axes = plt.subplots(num_rows, 2, figsize=(12, 4 * num_rows))
+    # fig.suptitle("MPCT and MPCK Test Position Results", fontsize=16)
 
-    axes = axes.flatten()  # Flatten the axes array to easily iterate over it
+    # axes = axes.flatten()  # Flatten the axes array to easily iterate over it
+
+    # for i, (name, pos_gt, pos_kf) in enumerate(zip(tests.keys(), pos_all_gt, pos_all_kf)):
+    #     ax = axes[i]
+    #     ax.scatter(starts[i][0], starts[i][1], color='green', marker='o', label='Start', zorder=4)
+    #     ax.scatter(goals[i, 0], goals[i, 1], color='red', marker='x', label='End', zorder=4)
+
+    #     # Plot GT data
+    #     ax.plot(pos_gt[:, 0], pos_gt[:, 1], label="GT", zorder=2)
+        
+    #     # Plot KF data with noise
+    #     ax.plot(pos_kf[:, 0], pos_kf[:, 1], label="KF", color="red", linestyle="--", zorder=3)
+        
+    #     ax.set_title(name)
+    #     ax.set_xlabel("X Position")
+    #     ax.set_ylabel("Y Position")
+    #     ax.grid(True)
+    #     ax.legend()
+
+    #     ax.set_xlim(-1, 5)
+    #     ax.set_ylim(-1, 5)
+
+    # # Hide any unused subplots if the number of tests is odd
+    # for j in range(i + 1, len(axes)):
+    #     fig.delaxes(axes[j])
+
+    # plt.tight_layout(rect=[0, 0, 1, 0.95])
+    # # plt.savefig("/Users/joefarah/Desktop/Figures/E&C_Final/Task_4/mpct_mpck_test_trajectories.png", dpi=300)
+    # # plt.show()
+
+    fig, axes = plt.subplots(num_tests, 2, figsize=(14, 3 * num_tests))
+    fig.suptitle("Trajectory and Error for MPCT and MPCK Test Cases", fontsize=16)
 
     for i, (name, pos_gt, pos_kf) in enumerate(zip(tests.keys(), pos_all_gt, pos_all_kf)):
-        ax = axes[i]
-        ax.scatter(starts[i][0], starts[i][1], color='green', marker='o', label='Start', zorder=4)
-        ax.scatter(goals[i, 0], goals[i, 1], color='red', marker='x', label='End', zorder=4)
+        # Calculate Euclidean distance error for MPCT and MPCK
+        goal_pos = goals[i][:2]
+        error_gt = np.linalg.norm(pos_gt[:, :2] - goal_pos, axis=1)
+        error_kf = np.linalg.norm(pos_kf[:, :2] - goal_pos, axis=1)
 
-        # Plot GT data
-        ax.plot(pos_gt[:, 0], pos_gt[:, 1], label="GT", zorder=2)
-        
-        # Plot KF data with noise
-        ax.plot(pos_kf[:, 0], pos_kf[:, 1], label="KF", color="red", linestyle="--", zorder=3)
-        
-        ax.set_title(name)
-        ax.set_xlabel("X Position")
-        ax.set_ylabel("Y Position")
-        ax.grid(True)
-        ax.legend()
+        # Create a new figure for each test case
+        fig = plt.figure(figsize=(14, 6))
+        fig.suptitle(f"{name} - Trajectory and Error")
 
-        ax.set_xlim(-1, 5)
-        ax.set_ylim(-1, 5)
+        # Trajectory subplot
+        ax_traj = fig.add_subplot(1, 2, 1)
+        ax_traj.scatter(starts[i, 0], starts[i, 1], color='green', marker='o', label='Start', zorder=4)
+        ax_traj.scatter(goals[i, 0], goals[i, 1], color='red', marker='x', label='Goal', zorder=4)
+        ax_traj.plot(pos_gt[:, 0], pos_gt[:, 1], label="GT", zorder=2)
+        ax_traj.plot(pos_kf[:, 0], pos_kf[:, 1], label="KF", color="red", linestyle="--", zorder=3)
+        ax_traj.set_title("Trajectory")
+        ax_traj.set_xlabel("X Position")
+        ax_traj.set_ylabel("Y Position")
+        ax_traj.grid(True)
+        ax_traj.legend()
+        ax_traj.set_xlim(-1, 5)
+        ax_traj.set_ylim(-1, 5)
 
-    # Hide any unused subplots if the number of tests is odd
-    for j in range(i + 1, len(axes)):
-        fig.delaxes(axes[j])
+        # Error subplot
+        ax_error = fig.add_subplot(1, 2, 2)
+        ax_error.plot(time, error_gt, label="GT Error", color='C0')
+        ax_error.plot(time, error_kf, label="KF Error", color='red', linestyle="--")
+        ax_error.set_title("Error Over Time")
+        ax_error.set_xlabel("Time (s)")
+        ax_error.set_ylabel("Error (Euclidean Distance)")
+        ax_error.grid(True)
+        ax_error.legend()
 
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
-    # plt.savefig("/Users/joefarah/Desktop/Figures/E&C_Final/Task_4/mpct_mpck_test_trajectories.png", dpi=300)
-    plt.show()
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+        plt.savefig(f"/Users/joefarah/Desktop/Figures/E&C_Final/Task_4/{name}_trajectory_error.png", dpi=300)
+        # plt.show()
 
-    # pos_all_gt, pos_all_kf, goals, results = [], [], [], {"MPCT": [], "MPCK": []}
-    # time  = np.arange(0, 5.001, 0.001)
-
-    # for name, test in tests.items():
-    #     print(f"\n{name}")
-    #     goals.append(test.get_goal_state())
-        
-    #     # Ground truth (GT) without noise
-    #     pos_gt, _, _ = test.test_gt()
-    #     pos_all_gt.append(pos_gt)
-    #     results["MPCT"].append(calculate_metrics(pos_gt, test.get_goal_state(), time))
-        
-    #     # Kalman Filter (KF) with noise
-    #     pos_kf, _, _, _, _ = test.test_kf(noise_flag=1)
-    #     pos_all_kf.append(pos_kf)
-    #     results["MPCK"].append(calculate_metrics(pos_kf, test.get_goal_state(), time))
 
     # Convert results to arrays
     steady_state_error_mpct, settling_time_mpct, overshoot_mpct, undershoot_mpct = zip(*results["MPCT"])
@@ -225,8 +251,8 @@ if __name__ == "__main__":
     for i, (x, y) in enumerate(zip(test_labels, steady_state_error_mpck)):
         plt.text(x, y + 0.02, f"{y:.2f}", ha='center', color='red')   # MPCK values
 
-    # plt.savefig("/Users/joefarah/Desktop/Figures/E&C_Final/Task_4/mpct_mpck_test_sse.png", dpi=300)
-    plt.show()
+    plt.savefig("/Users/joefarah/Desktop/Figures/E&C_Final/Task_4/mpct_mpck_test_sse.png", dpi=300)
+    # plt.show()
 
     # Plot Settling Time
     plt.figure(figsize=(10, 5))
@@ -246,8 +272,8 @@ if __name__ == "__main__":
     for i, (x, y) in enumerate(zip(test_labels, settling_time_mpck)):
         plt.text(x, y + 0.3, f"{y:.2f}", ha='center', color='red')   # MPCK values
 
-    # plt.savefig("/Users/joefarah/Desktop/Figures/E&C_Final/Task_4/mpct_mpck_test_settlingtime.png", dpi=300)
-    plt.show()
+    plt.savefig("/Users/joefarah/Desktop/Figures/E&C_Final/Task_4/mpct_mpck_test_settlingtime.png", dpi=300)
+    # plt.show()
 
     # Plot Overshoot
     plt.figure(figsize=(10, 5))
@@ -279,5 +305,5 @@ if __name__ == "__main__":
     for i, (x, y) in enumerate(zip(test_labels, overshoot_mpck)):
         plt.text(x, y + 1, f"{y:.2f}%", ha='center', color='red')   # MPCK values
 
-    # plt.savefig("/Users/joefarah/Desktop/Figures/E&C_Final/Task_4/mpct_mpck_test_overshoot.png", dpi=300)
-    plt.show()
+    plt.savefig("/Users/joefarah/Desktop/Figures/E&C_Final/Task_4/mpct_mpck_test_overshoot.png", dpi=300)
+    # plt.show()
