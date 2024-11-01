@@ -84,30 +84,30 @@ class Simulator(object):
         y = np.array(y)
         return y
     
-    # 不仅测量range 还测量bearing
+    # range and bearing observations
     # x: (3,1)
-    # y: (2N,1) N为landmark的数量
+    # y: (2N,1) N is the number of landmarks
     # sigmaXZ: (3,2N)
     # sigmaZZ: (2N,2N) 
-    # K: (3,2N) Kalman增益
+    # K: (3,2N) Kalman gain
     # C: (2N,3) observation Jacobian
     # w: (2N,2N) noise measure
     # v: (2N,1) noise update
     def landmark_range_bearing_observations(self):
         y = []
         W_range = self._filter_config.W_range
-        W_bearing = self._filter_config.W_bearing  # 方位角的测量噪声
+        W_bearing = self._filter_config.W_bearing 
         
         for lm in self._map.landmarks:
             dx = lm[0] - self._x_true[0]
             dy = lm[1] - self._x_true[1]
             
-            # 计算真实的距离和方位角
+            # True range and bearing measurements
             range_true = np.sqrt(dx**2 + dy**2)
             bearing_true = np.arctan2(dy, dx) - self._x_true[2]
             bearing_true = np.arctan2(np.sin(bearing_true), np.cos(bearing_true))  # Angle wrapping
 
-            # 加入噪声
+            # with noise
             range_meas = range_true + np.random.normal(0, np.sqrt(W_range))
             bearing_meas = bearing_true + np.random.normal(0, np.sqrt(W_bearing))
 
@@ -215,9 +215,8 @@ plt.show()
 # wrapping". This small helper function is used
 # to address the issue.
 
-# 报告里写，这个wrap_angle的作用
-# 该函数的作用是将角度限制在-pi到pi之间 3pi -> pi
-# 否则角度会出现跳变 导致误差很大 
+# The purpose of this function is to limit the angle to -pi to pi 3pi -> pi
+# Otherwise the angle would jump, leading to large errors. 
 def wrap_angle(angle): return np.arctan2(np.sin(angle), np.cos(angle))
 
 
