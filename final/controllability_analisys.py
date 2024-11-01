@@ -1,9 +1,9 @@
 import numpy as np
 
 # Example values
-v0 = 1.0             # Initial velocity
-theta0 = np.pi / 4   # Initial orientation (45 degrees)
-delta_t = 0.1        # Time step
+v0 = 1            # Initial velocity
+theta0 = 0.78   # Initial orientation (45 degrees)
+delta_t = 0.001        # Time step
 
 # System matrices
 A = np.array([
