@@ -254,8 +254,8 @@ def main():
         plt.legend()
 
         plt.tight_layout()
-        plt.savefig(f'/Users/joefarah/Desktop/Figures/E&C_Lab3/joint_{i+1}_tracking_linear.png', dpi=300)
-        # plt.show()
+        # plt.savefig(f'/Users/joefarah/Desktop/Figures/E&C_Lab3/joint_{i+1}_tracking_linear.png', dpi=300)
+        plt.show()
 
     # fig, axes = plt.subplots(num_joints, 2, figsize=(14, num_joints * 3))  
 

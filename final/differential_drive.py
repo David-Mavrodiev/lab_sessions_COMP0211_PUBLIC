@@ -1,3 +1,4 @@
+import json
 import numpy as np
 import time
 import os
@@ -5,18 +6,23 @@ import matplotlib.pyplot as plt
 from simulation_and_control import pb, MotorCommands, PinWrapper, feedback_lin_ctrl, SinusoidalReference, CartesianDiffKin, differential_drive_controller_adjusting_bearing
 from simulation_and_control import differential_drive_regulation_controller,regulation_polar_coordinates,regulation_polar_coordinate_quat,wrap_angle,velocity_to_wheel_angular_velocity
 import pinocchio as pin
+from robot_localization_system import FilterConfiguration, Map, RobotEstimator
 from regulator_model import RegulatorModel
 
 # global variables
 W_range = 0.5 ** 2  # Measurement noise variance (range measurements)
-landmarks = np.array([
-            [5, 10],
-            [15, 5],
-            [10, 15]
-        ])
+W_bearing = (np.pi * 0.5 / 180.0) ** 2
+# landmarks = []
+# for x in range(-25, 25, 10):
+#     for y in range(-15, 35, 10):
+#         landmarks.append([x, y])
+# landmarks = np.array(landmarks)
+landmarks = np.array([[5, 10], [15, 5], [10, 15]])
+DYNAMIC = 1
+FIXED = 0
 
 
-def landmark_range_observations(self, base_position):
+def landmark_range_observations(base_position):
     y = []
     C = []
     W = W_range
@@ -25,10 +31,36 @@ def landmark_range_observations(self, base_position):
         dx = lm[0] - base_position[0]
         dy = lm[1] - base_position[1]
         range_meas = np.sqrt(dx**2 + dy**2)
-       
+        range_meas = range_meas + np.random.normal(0, np.sqrt(W))
+
         y.append(range_meas)
 
     y = np.array(y)
+    return y
+
+def landmark_range_bearing_observations(base_position, base_orientation):
+    y = []
+    C = []
+
+    for lm in landmarks:
+        # True range measurement (with noise)
+        dx = lm[0] - base_position[0]
+        dy = lm[1] - base_position[1]
+        
+        # Range measurement
+        range_true = np.sqrt(dx**2 + dy**2)
+        range_meas = range_true + np.random.normal(0, np.sqrt(W_range))
+        
+        # Bearing measurement
+        bearing_true = np.arctan2(dy, dx) - base_orientation
+        bearing_true = np.arctan2(np.sin(bearing_true), np.cos(bearing_true))  # Angle wrapping
+        bearing_meas = bearing_true + np.random.normal(0, np.sqrt(W_bearing))
+        
+        # Append range and bearing measurements
+        y.append([range_meas, bearing_meas])
+
+    # Convert to a numpy array for consistency
+    y = np.array(y).flatten()
     return y
 
 
@@ -48,27 +80,61 @@ def quaternion2bearing(q_w, q_x, q_y, q_z):
     return bearing_
 
 
-def init_simulator(conf_file_name):
-    """Initialize simulation and dynamic model."""
+# def init_simulator(conf_file_name):
+#     """Initialize simulation and dynamic model."""
+#     cur_dir = os.path.dirname(os.path.abspath(__file__))
+#     sim = pb.SimInterface(conf_file_name, conf_file_path_ext=cur_dir, use_gui=False)
+    
+#     ext_names = np.expand_dims(np.array(sim.getNameActiveJoints()), axis=0)
+#     source_names = ["pybullet"]
+    
+#     dyn_model = PinWrapper(conf_file_name, "pybullet", ext_names, source_names, False, 0, cur_dir)
+#     num_joints = dyn_model.getNumberofActuatedJoints()
+    
+#     return sim, dyn_model, num_joints
+
+def init_simulator(conf_file_name, init_position, init_orientation, noise_flag=0):
+    """Initialize simulation and dynamic model with a custom initial position and bearing."""
+    
+    # Load the JSON configuration
     cur_dir = os.path.dirname(os.path.abspath(__file__))
-    sim = pb.SimInterface(conf_file_name, conf_file_path_ext=cur_dir)
+    with open(cur_dir + "/configs/"  + conf_file_name, 'r') as file:
+        config = json.load(file)
+
+    print(init_position)
+    
+    # Update initial position and orientation (bearing in quaternion)
+    config["robot_pybullet"]["init_link_base_position"] = [init_position]
+    config["robot_pybullet"]["init_link_base_orientation"] = [init_orientation]
+    config["robot_pybullet"]["noise_flag"] = [noise_flag]
+
+    
+    # Write the updated configuration to a temporary file
+    temp_conf_file = os.path.join(cur_dir, "temp_conf.json")
+    with open(temp_conf_file, 'w') as file:
+        json.dump(config, file)
+    
+    # Initialize the simulator with the updated config file
+    sim = pb.SimInterface(temp_conf_file, conf_file_path_ext=cur_dir, use_gui=False)
     
     ext_names = np.expand_dims(np.array(sim.getNameActiveJoints()), axis=0)
     source_names = ["pybullet"]
     
-    dyn_model = PinWrapper(conf_file_name, "pybullet", ext_names, source_names, False, 0, cur_dir)
+    dyn_model = PinWrapper(temp_conf_file, "pybullet", ext_names, source_names, False, 0, cur_dir)
     num_joints = dyn_model.getNumberofActuatedJoints()
     
     return sim, dyn_model, num_joints
 
 
-def main():
+def run(linearization_type=DYNAMIC, init_pos=[2.0, 3.0, 0.0], init_quat=[0,0,0.3827,0.9239],goal_state=None, noise_flag=0):
     # Configuration for the simulation
     conf_file_name = "robotnik.json"  # Configuration file for the robot
-    sim,dyn_model,num_joints=init_simulator(conf_file_name)
+    init_pos = init_pos
+    init_quat = init_quat
+    sim,dyn_model,num_joints=init_simulator(conf_file_name, init_position=init_pos, init_orientation=init_quat, noise_flag=noise_flag)
 
     # adjusting floor friction
-    floor_friction = 1
+    floor_friction = 100
     sim.SetFloorFriction(floor_friction)
     # getting time step
     time_step = sim.GetTimeStep()
@@ -76,7 +142,8 @@ def main():
 
    
     # Initialize data storage
-    base_pos_all, base_bearing_all = [], []#
+    base_pos_all, base_bearing_all = [], []
+    
 
     # initializing MPC
      # Define the matrices
@@ -92,21 +159,32 @@ def main():
     N_mpc = 10
 
     # Initialize the regulator model
-    regulator = RegulatorModel(N_mpc, num_states, num_joints, num_states)
+    regulator = RegulatorModel(N_mpc, num_states, num_controls, num_states)
     # update A,B,C matrices
     # TODO provide state_x_for_linearization,cur_u_for_linearization to linearize the system
     # you can linearize around the final state and control of the robot (everything zero)
     # or you can linearize around the current state and control of the robot
     # in the second case case you need to update the matrices A and B at each time step
     # and recall everytime the method updateSystemMatrices
-    regulator.updateSystemMatrices(sim,state_x_for_linearization,cur_u_for_linearization)
+    init_pos  = np.array(init_pos)
+    init_quat = np.array(init_quat)
+    init_base_bearing_ = quaternion2bearing(init_quat[3], init_quat[0], init_quat[1], init_quat[2])
+
+    # Choose lienarization type
+    if linearization_type == FIXED:
+        cur_state_x_for_linearization = [0.0001, 0.0001, 0.0001] # Set it close to 0 not 0
+    else:
+        cur_state_x_for_linearization = [init_pos[0], init_pos[1], init_base_bearing_] # No Kalman filter
+
+    cur_u_for_linearization = np.zeros(num_controls)
+
+    regulator.updateSystemMatrices(sim,cur_state_x_for_linearization,cur_u_for_linearization)
     # Define the cost matrices
-    Qcoeff = 1000
-    Rcoeff = 1
+    Qcoeff = np.array([250, 250, 280.0]) 
+    Rcoeff = [0.5, 0.2]
     regulator.setCostMatrices(Qcoeff,Rcoeff)
-   
 
-
+    u_mpc = np.zeros(num_controls)
 
     ##### robot parameters ########
     wheel_radius = 0.11
@@ -120,16 +198,14 @@ def main():
     init_interface_all_wheels = ["velocity", "velocity", "velocity", "velocity"]
     cmd.SetControlCmd(init_angular_wheels_velocity_cmd, init_interface_all_wheels)
     
-    while True:
-
-
+    while current_time < 5:
         # True state propagation (with process noise)
         ##### advance simulation ##################################################################
         sim.Step(cmd, "torque")
         time_step = sim.GetTimeStep()
 
-        # Kalman filter prediction
-       
+
+        ############################################################################################
     
         # Get the measurements from the simulator ###########################################
          # measurements of the robot without noise (just for comparison purpose) #############
@@ -142,13 +218,9 @@ def main():
         base_pos = sim.GetBasePosition()
         base_ori = sim.GetBaseOrientation()
         base_bearing_ = quaternion2bearing(base_ori[3], base_ori[0], base_ori[1], base_ori[2])
-        y = landmark_range_observations(base_pos)
-    
-        # Update the filter with the latest observations
-        
-    
-        # Get the current state estimate
-        
+        y = landmark_range_bearing_observations(base_pos, base_bearing_)
+
+        ############################################################################################
 
         # Figure out what the controller should do next
         # MPC section/ low level controller section ##################################################################
@@ -156,10 +228,24 @@ def main():
    
         # Compute the matrices needed for MPC optimization
         # TODO here you want to update the matrices A and B at each time step if you want to linearize around the current points
+        # add this 3 lines if you want to update the A and B matrices at each time step 
+        if linearization_type == DYNAMIC:
+            cur_state_x_for_linearization = [base_pos[0], base_pos[1], base_bearing_] # No Kalman filter
+            cur_u_for_linearization = u_mpc
+            regulator.updateSystemMatrices(sim,cur_state_x_for_linearization,cur_u_for_linearization)
+
+        regulator.setCostMatrices(Qcoeff,Rcoeff)
+
+
         S_bar, T_bar, Q_bar, R_bar = regulator.propagation_model_regulator_fixed_std()
         H,F = regulator.compute_H_and_F(S_bar, T_bar, Q_bar, R_bar)
-        x0_mpc = np.vstack((base_pos[:2], base_bearing_))
+
+        x0_mpc = np.hstack((base_pos[:2], base_bearing_))
         x0_mpc = x0_mpc.flatten()
+
+        if goal_state is not None:
+            x0_mpc -= goal_state
+        
         # Compute the optimal control sequence
         H_inv = np.linalg.inv(H)
         u_mpc = -H_inv @ F @ x0_mpc
@@ -172,15 +258,11 @@ def main():
         cmd.SetControlCmd(angular_wheels_velocity_cmd, interface_all_wheels)
 
 
-       
-
         # Exit logic with 'q' key (unchanged)
         keys = sim.GetPyBulletClient().getKeyboardEvents()
         qKey = ord('q')
         if qKey in keys and keys[qKey] and sim.GetPyBulletClient().KEY_WAS_TRIGGERED:
             break
-        
-
 
         # Store data for plotting if necessary
         base_pos_all.append(base_pos)
@@ -188,14 +270,85 @@ def main():
 
         # Update current time
         current_time += time_step
+        print("current time: ", current_time)
+
+    return base_pos_all, base_bearing_all, goal_state
 
 
     # Plotting 
     #add visualization of final x, y, trajectory and theta
+    # base_pos_all = np.array(base_pos_all)
+    # base_bearing_all = np.array(base_bearing_all)
+    # plt.figure()
+    # plt.plot(base_pos_all[:, 0], base_pos_all[:, 1], label='True Path')
+    # plt.legend()
+    # plt.show()
+    # plt.figure()
+    # plt.plot(base_bearing_all, label='True Theta')
+    # plt.legend()
+    # plt.show()
+    # # Convert history lists to arrays.
+    # base_pos_all = np.array(base_pos_all)
+    # base_bearing_all = np.array(base_bearing_all)
+    # # Plotting the true path, estimated path, and landmarks.
+    # plt.figure()
+    # plt.plot(base_pos_all[:, 0], base_pos_all[:, 1], label='True Path')
+    # plt.scatter(landmarks[:, 0], landmarks[:, 1],
+    #             marker='x', color='red', label='Landmarks')
+    # plt.legend()
+    # plt.show()
+    # plt.figure()
+    # plt.plot(base_bearing_all, label='True Theta')
+    # plt.legend()
+    # plt.show()
+
+
     
     
     
     
 
 if __name__ == '__main__':
-    main()
+    linearization_types = [DYNAMIC, FIXED]
+
+    base_pos_comp, base_bearing_comp = [], []
+    goal_state = [0, 0, 0]
+
+
+    for linearization_type in linearization_types:
+        base_pos_all, base_bearing_all, goal_state = run(linearization_type)
+        base_pos_comp.append(base_pos_all)
+        base_bearing_comp.append(base_bearing_all)
+        break
+
+    # Plotting
+    base_pos_comp = np.array(base_pos_comp)
+    base_bearing_comp = np.array(base_bearing_comp)
+    if goal_state is None:
+        goal_state = [0, 0, 0]
+
+
+    plt.figure()
+    plt.plot(base_pos_comp[0, :, 0], base_pos_comp[0, :, 1], label='True Path - Dynamic')
+    plt.scatter(goal_state[0], goal_state[1], color='green', marker='o', label='Goal Point', zorder=5)
+    # plt.plot(base_pos_comp[1, :, 0], base_pos_comp[1, :, 1], label='True Path - Fixed', linestyle='--')
+    plt.legend()
+    plt.grid()
+    # plt.savefig("/Users/joefarah/Desktop/Figures/E&C_Final/Task_2/path.png")
+    plt.show()
+
+    plt.figure()
+    plt.plot(base_bearing_comp[0], label='True Theta - Dynamic')
+    # plt.plot(base_bearing_comp[1], label='True Theta - Fixed', linestyle='--')
+    plt.legend()
+    plt.grid()
+    # plt.savefig("/Users/joefarah/Desktop/Figures/E&C_Final/Task_2/bearing.png")
+    plt.show()
+
+
+
+
+
+
+
+    

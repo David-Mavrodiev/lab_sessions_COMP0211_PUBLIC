@@ -16,9 +16,9 @@
         "robot_description_model":[""],
         "urdf_path": ["summit_xl_description/summit_xl.urdf"],
         "ros_urdf_path": "",
-        "init_link_base_position": [[]],
+        "init_link_base_position": [[2.0, 3.0, 0.0]],
         "init_link_base_vel": [[0.0, 0.0, 0.0]],
-        "init_link_base_orientation": [[]],
+        "init_link_base_orientation": [[0, 0, 0.3827, 0.9239]],
         "init_link_base_ang_vel": [[0.0, 0.0, 0.0]],
         "init_motor_angles": [[0.000, 0.000, 0.0000, 0.0000]],
         "init_motor_vel":[[0.0, 0.0, 0.0, 0.0]],
@@ -41,14 +41,14 @@
         "noise_flag":[0],
         "robot_noise":[
                 {
-                    "joint_cov": 0.0001,
-                    "joint_vel_cov": 0.0001,
-                    "joint_acc_cov": 0.0001,
-                    "base_pos_cov": 0.0001,
-                    "base_ori_cov": 0.0001,
-                    "base_lin_vel_cov": 0.0001,
-                    "base_ang_vel_cov": 0.0001,
-                    "joint_torque_cov":0.0001
+                    "joint_cov": 0.0,
+                    "joint_vel_cov": 0.0,
+                    "joint_acc_cov": 0.0,
+                    "base_pos_cov": 1,
+                    "base_ori_cov": 1,
+                    "base_lin_vel_cov": 0.0,
+                    "base_ang_vel_cov": 0.0,
+                    "joint_torque_cov":0.0
                 }
         ]
     },

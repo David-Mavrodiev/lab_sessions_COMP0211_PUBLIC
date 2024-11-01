@@ -22,7 +22,7 @@ def quaternion2bearing(q_w, q_x, q_y, q_z):
     return bearing_
 
 
-estimation_switch = False
+estimation_switch   = True
 
 def main():
     # Configuration for the simulation
@@ -264,11 +264,7 @@ def main():
     axs[1].grid(True)
 
     plt.tight_layout()
-    # plt.show()
-    plt.savefig('/Users/joefarah/Desktop/Figures/E&C_Lab4/robot_trajectory_no_noise.png', dpi=300)
-
-    
-
+    plt.show()
     
    
      

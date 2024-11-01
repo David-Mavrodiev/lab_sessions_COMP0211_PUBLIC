@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 
 class FilterConfiguration(object):
-    def __init__(self):
+    def __init__(self, x0=np.array([0, 0, np.pi / 4]), Sigma0=np.diag([1.0, 1.0, 0.5]) ** 2):
         # Process and measurement noise covariance matrices
         self.V = np.diag([0.1, 0.1, 0.05]) ** 2  # Process noise covariance
         # Measurement noise variance (range measurements)
@@ -13,33 +13,36 @@ class FilterConfiguration(object):
         self.W_bearing = (np.pi * 0.5 / 180.0) ** 2
 
         # Initial conditions for the filter
-        self.x0 = np.array([2.0, 3.0, np.pi / 4])
-        self.Sigma0 = np.diag([1.0, 1.0, 0.5]) ** 2
+        self.x0 = x0
+        self.Sigma0 = Sigma0
 
 
 class Map(object):
-    def __init__(self):
+    def __init__(self, landmarks=None):
         # self.landmarks = np.array([
         #     [5, 10],
         #     [15, 5],
         #     [10, 15]
         # ])
 
-        """ Task 1 """
+        
+        if landmarks is not None:
+            self.landmarks = np.array(landmarks)
+        else:
+            """ Task 1 """
+            # # Activity 2
+            landmarks = []
+            for x in range(-25, 25, 5):
+                for y in range(-15, 35, 5):
+                    landmarks.append([x, y])
+            self.landmarks = np.array(landmarks)
 
-        # Activity 2
-        landmarks = []
-        for x in range(-25, 25, 5):
-            for y in range(-15, 35, 5):
-                landmarks.append([x, y])
-        self.landmarks = np.array(landmarks)
-
-        # Activity 4
-        # landmarks = []
-        # for x in range(-15, 15, 5):
-        #     for y in range(-15, 15, 5):
-        #         landmarks.append([x, y])
-        # self.landmarks = np.array(landmarks)
+            # Activity 4
+            # landmarks = []
+            # for x in range(-15, 15, 5):
+            #     for y in range(-15, 15, 5):
+            #         landmarks.append([x, y])
+            # self.landmarks = np.array(landmarks)
 
 
 
@@ -175,7 +178,7 @@ class RobotEstimator(object):
         C = []
         x_pred = self._x_pred
 
-        for lm in self._map.landmarks:
+        for lm in self._map.landmarks:  
             dx_pred = lm[0] - x_pred[0]
             dy_pred = lm[1] - x_pred[1]
 
