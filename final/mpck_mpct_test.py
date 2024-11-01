@@ -214,8 +214,8 @@ if __name__ == "__main__":
         ax_error.legend()
 
         plt.tight_layout(rect=[0, 0, 1, 0.95])
-        plt.savefig(f"/Users/joefarah/Desktop/Figures/E&C_Final/Task_4/{name}_trajectory_error.png", dpi=300)
-        # plt.show()
+        # plt.savefig(f"/Users/joefarah/Desktop/Figures/E&C_Final/Task_4/{name}_trajectory_error.png", dpi=300)
+        plt.show()
 
 
     # Convert results to arrays
@@ -251,8 +251,8 @@ if __name__ == "__main__":
     for i, (x, y) in enumerate(zip(test_labels, steady_state_error_mpck)):
         plt.text(x, y + 0.02, f"{y:.2f}", ha='center', color='red')   # MPCK values
 
-    plt.savefig("/Users/joefarah/Desktop/Figures/E&C_Final/Task_4/mpct_mpck_test_sse.png", dpi=300)
-    # plt.show()
+    # plt.savefig("/Users/joefarah/Desktop/Figures/E&C_Final/Task_4/mpct_mpck_test_sse.png", dpi=300)
+    plt.show()
 
     # Plot Settling Time
     plt.figure(figsize=(10, 5))
@@ -272,8 +272,8 @@ if __name__ == "__main__":
     for i, (x, y) in enumerate(zip(test_labels, settling_time_mpck)):
         plt.text(x, y + 0.3, f"{y:.2f}", ha='center', color='red')   # MPCK values
 
-    plt.savefig("/Users/joefarah/Desktop/Figures/E&C_Final/Task_4/mpct_mpck_test_settlingtime.png", dpi=300)
-    # plt.show()
+    # plt.savefig("/Users/joefarah/Desktop/Figures/E&C_Final/Task_4/mpct_mpck_test_settlingtime.png", dpi=300)
+    plt.show()
 
     # Plot Overshoot
     plt.figure(figsize=(10, 5))
@@ -305,5 +305,5 @@ if __name__ == "__main__":
     for i, (x, y) in enumerate(zip(test_labels, overshoot_mpck)):
         plt.text(x, y + 1, f"{y:.2f}%", ha='center', color='red')   # MPCK values
 
-    plt.savefig("/Users/joefarah/Desktop/Figures/E&C_Final/Task_4/mpct_mpck_test_overshoot.png", dpi=300)
-    # plt.show()
+    # plt.savefig("/Users/joefarah/Desktop/Figures/E&C_Final/Task_4/mpct_mpck_test_overshoot.png", dpi=300)
+    plt.show()
