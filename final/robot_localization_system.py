@@ -31,6 +31,8 @@ class Map_self(object):
     def __init__(self):
         grid_spacing = 5
         landmarks = []
+        radius = 25
+        num_landmarks = 36
 
         # 30*30 36
         for x in range(-15, 15, grid_spacing):
@@ -41,6 +43,18 @@ class Map_self(object):
         # for x in range(-25, 25, grid_spacing):
         #     for y in range(-25, 25, grid_spacing):
         #         landmarks.append([x, y])
+       
+        # # circle
+        # for angle in np.arange(0, 2 * np.pi, grid_spacing / radius):
+        #     x = radius * np.cos(angle)
+        #     y = radius * np.sin(angle)
+        #     landmarks.append([x, y])
+
+        # # random
+        # landmarks = np.column_stack((
+        #     np.random.uniform(-15, 15, num_landmarks),
+        #     np.random.uniform(-15, 15, num_landmarks)
+        # ))
         
         self.landmarks = np.array(landmarks)
 
