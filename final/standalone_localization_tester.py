@@ -2,6 +2,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 
 from robot_localization_system import FilterConfiguration, Map, Map_self, RobotEstimator
 
@@ -160,6 +161,8 @@ x_true_history = []
 x_est_history = []
 Sigma_est_history = []
 
+start_time = time.time()
+
 # Main loop
 for step in range(sim_config.time_steps):
 
@@ -191,6 +194,10 @@ for step in range(sim_config.time_steps):
     x_true_history.append(simulator.x_true())
     x_est_history.append(x_est)
     Sigma_est_history.append(np.diagonal(Sigma_est))
+
+# record run time
+end_time = time.time()
+print(f"Total execution time: {end_time - start_time} seconds")
 
 # Convert history lists to arrays.
 x_true_history = np.array(x_true_history)
