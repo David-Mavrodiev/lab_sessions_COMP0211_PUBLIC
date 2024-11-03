@@ -72,7 +72,6 @@ class RegulatorModel:
         v0 = cur_u[0]  # Current velocity (first control input)
         theta0 = cur_x[2]  # Current orientation (theta)
         delta_t = sim.GetTimeStep()  # Time step from simulator
-        print(f"v0: {v0}, theta0: {theta0}, delta_t: {delta_t}")
 
         # Define the A and B matrices based on linearized dynamics
         # System matrices
