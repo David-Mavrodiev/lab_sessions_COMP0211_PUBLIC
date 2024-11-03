@@ -1,6 +1,1 @@
 week_5_bis/.vscode/launch.json
-# Ignore the build directory
-models/
-
-# Ignore the egg-info directory
-configs/
