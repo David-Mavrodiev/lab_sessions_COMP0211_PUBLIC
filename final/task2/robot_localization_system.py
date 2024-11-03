@@ -19,11 +19,32 @@ class FilterConfiguration(object):
 
 class Map(object):
     def __init__(self):
-        self.landmarks = np.array([
-            [5, 10],
-            [15, 5],
-            [10, 15]
-        ])
+        grid_spacing = 5  # Distance between landmarks in meters
+        x_min, x_max = -25, 25
+        y_min, y_max = -25, 25
+
+        x_coords = np.arange(x_min, x_max + grid_spacing, grid_spacing)
+        y_coords = np.arange(y_min, y_max + grid_spacing, grid_spacing)
+        self.landmarks = np.array([[x, y] for x in x_coords for y in y_coords])
+        # self.landmarks = np.array([
+        #     [5, 10],
+        #     [15, 5],
+        #     [10, 15],
+
+        #     # More landmarks
+        #     # [0, 0],
+        #     # [20, 0],
+        #     # [0, 20],
+        #     # [20, 20],
+        #     # [10, 0],
+        #     # [0, 10],
+        #     # [20, 10],
+        #     # [10, 20],
+        #     # [5, 5],
+        #     # [15, 15],
+        #     # [5, 15],
+        #     # [15, 5]
+        # ])
 
 
 class RobotEstimator(object):
@@ -150,3 +171,48 @@ class RobotEstimator(object):
         # Angle wrap afterwards
         self._x_est[-1] = np.arctan2(np.sin(self._x_est[-1]),
                                      np.cos(self._x_est[-1]))
+        
+    def update_from_landmark_range_bearing_observations(self, y_range_bearing):
+        x_pred = self._x_pred
+        num_landmarks = len(self._map.landmarks)
+        W_list = []
+
+        y_pred = []
+        C = []
+
+        for i, lm in enumerate(self._map.landmarks):
+            dx = lm[0] - x_pred[0]
+            dy = lm[1] - x_pred[1]
+            q = dx**2 + dy**2
+            sqrt_q = np.sqrt(q)
+
+            # Predicted measurements
+            range_pred = sqrt_q
+            bearing_pred = np.arctan2(dy, dx) - x_pred[2]
+            bearing_pred = np.arctan2(np.sin(bearing_pred), np.cos(bearing_pred))  # Angle wrapping
+
+            y_pred.extend([range_pred, bearing_pred])
+
+            # Measurement Jacobian
+            C_i = np.array([
+                [ -dx / sqrt_q, -dy / sqrt_q, 0 ],
+                [  dy / q,      -dx / q,     -1 ]
+            ])
+            C.append(C_i)
+
+            # Measurement noise covariance for this landmark
+            W_list.append(self._config.W_range)
+            W_list.append(self._config.W_bearing)
+
+        y_pred = np.array(y_pred)
+        C = np.vstack(C)
+        W = np.diag(W_list)
+
+        # Flatten the measurement array
+        y_range_bearing = y_range_bearing.flatten()
+
+        # Innovation
+        nu = y_range_bearing - y_pred
+        nu[1::2] = np.arctan2(np.sin(nu[1::2]), np.cos(nu[1::2]))  # Angle wrapping for bearings
+
+        self._do_kf_update(nu, C, W)
