@@ -237,6 +237,7 @@ for s in range(3):
     plt.plot(estimation_error[:, s])
     plt.plot(two_sigma, linestyle='dashed', color='red')
     plt.plot(-two_sigma, linestyle='dashed', color='red')
+    # error line 10 cm
     if s < 2:
         plt.plot(np.zeros_like(estimation_error[:, s]) + 0.1, linestyle='dashed', color='lightgreen')
         plt.plot(np.zeros_like(estimation_error[:, s]) - 0.1, linestyle='dashed', color='lightgreen')
