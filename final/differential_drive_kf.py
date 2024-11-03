@@ -182,7 +182,7 @@ def run(init_pos=[2.0, 3.0, 0.0], init_quat=[0,0,0.3827,0.9239], goal_state=None
     regulator.updateSystemMatrices(sim,cur_state_x_for_linearization,cur_u_for_linearization)
     # Define the cost matrices
     Qcoeff = np.array([310, 310, 340.0])
-    Rcoeff = [0.5, 0.2]
+    Rcoeff = [0.5, 0.1]
     regulator.setCostMatrices(Qcoeff,Rcoeff)
 
     u_mpc = np.zeros(num_controls)
@@ -207,7 +207,7 @@ def run(init_pos=[2.0, 3.0, 0.0], init_quat=[0,0,0.3827,0.9239], goal_state=None
 
         # Kalman filter prediction
         ekf.set_control_input(u_mpc)
-        ekf.predict_to(current_time)
+        ekf.predict_to(current_time + time_step)
 
 
         ############################################################################################
@@ -323,16 +323,25 @@ def run(init_pos=[2.0, 3.0, 0.0], init_quat=[0,0,0.3827,0.9239], goal_state=None
     
 
 if __name__ == '__main__':
-    base_pos_all, base_bearing_all, est_pos_all, est_bearing_all, goal_state = run(goal_state=[1, 1, 0], noise_flag=1)
+    base_pos_all, base_bearing_all, est_pos_all, est_bearing_all, goal_state = run(noise_flag=1)
     base_pos_all = np.array(base_pos_all)
     est_pos_all = np.array(est_pos_all)
 
     if goal_state is None:
         goal_state = [0, 0, 0]
 
+    goal_state = np.array(goal_state)
+    error = np.linalg.norm(base_pos_all[:, :2] - goal_state[:2], axis=1)
+
+    # Steady-state error (final error value)
+    steady_state_error = error[-1]
+
+    print(f"Steady-state error: {steady_state_error}")
+    exit()
+
     plt.figure()
-    plt.plot(base_pos_all[:, 0], base_pos_all[:, 1], label='True Path')
-    plt.plot(est_pos_all[:, 0], est_pos_all[:, 1], label='Estimated Path', linestyle='--')
+    plt.plot(base_pos_all[:, 0], base_pos_all[:, 1], label='True Path', zorder=4)
+    plt.plot(est_pos_all[:, 0], est_pos_all[:, 1], label='Estimated Path', linestyle='--', zorder=3)
     plt.scatter(goal_state[0], goal_state[1], color='green', marker='o', label='Goal Point', zorder=5)
     plt.legend()
     plt.grid()

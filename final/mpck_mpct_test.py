@@ -176,9 +176,6 @@ if __name__ == "__main__":
     # # plt.savefig("/Users/joefarah/Desktop/Figures/E&C_Final/Task_4/mpct_mpck_test_trajectories.png", dpi=300)
     # # plt.show()
 
-    fig, axes = plt.subplots(num_tests, 2, figsize=(14, 3 * num_tests))
-    fig.suptitle("Trajectory and Error for MPCT and MPCK Test Cases", fontsize=16)
-
     for i, (name, pos_gt, pos_kf) in enumerate(zip(tests.keys(), pos_all_gt, pos_all_kf)):
         # Calculate Euclidean distance error for MPCT and MPCK
         goal_pos = goals[i][:2]
@@ -218,7 +215,7 @@ if __name__ == "__main__":
         plt.show()
 
 
-    # Convert results to arrays
+    # Plot comparison of metrics for MPCT and MPCK
     steady_state_error_mpct, settling_time_mpct, overshoot_mpct, undershoot_mpct = zip(*results["MPCT"])
     steady_state_error_mpck, settling_time_mpck, overshoot_mpck, undershoot_mpck = zip(*results["MPCK"])
     test_labels = list(tests.keys())
@@ -227,83 +224,76 @@ if __name__ == "__main__":
     overshoot_mpct = [-u if o == 0 else o for o, u in zip(overshoot_mpct, undershoot_mpct)]
     overshoot_mpck = [-u if o == 0 else o for o, u in zip(overshoot_mpck, undershoot_mpck)]
 
+    # Bar width for side-by-side bars
+    bar_width = 0.35
+    x = np.arange(len(test_labels))
+
     # Plot Steady-State Error
     plt.figure(figsize=(10, 5))
-    plt.plot(test_labels, steady_state_error_mpct, label='MPCT', marker='o')
-    plt.plot(test_labels, steady_state_error_mpck, label='MPCK', marker='o', color='red', linestyle='--', zorder=3)
+    plt.bar(x - bar_width/2, steady_state_error_mpct, width=bar_width, label='MPCT', color='C0', zorder=3)
+    plt.bar(x + bar_width/2, steady_state_error_mpck, width=bar_width, label='MPCK', color='red', zorder=3)
     plt.title("Steady-State Error Comparison")
     plt.xlabel("Test Scenarios")
     plt.ylabel("Steady-State Error")
+    plt.xticks(x, test_labels)
     plt.legend()
-    plt.grid()
+    plt.grid(axis='y', zorder=-1, alpha=0.5)
 
-    max_error = 0
-    if max(steady_state_error_mpct) > max(steady_state_error_mpck):
-        max_error = max(steady_state_error_mpct)
-    else:
-        max_error = max(steady_state_error_mpck)
+    # Add values on top of each bar
+    for i, (mpct, mpck) in enumerate(zip(steady_state_error_mpct, steady_state_error_mpck)):
+        plt.text(i - bar_width/2, mpct + 0.007, f"{mpct:.2f}", ha='center', color='C0', zorder=4)
+        plt.text(i + bar_width/2, mpck + 0.007, f"{mpck:.2f}", ha='center', color='red', zorder=4)
 
-    plt.ylim(0, max_error + 0.2)
-
-    # Add values above markers for Steady-State Error
-    for i, (x, y) in enumerate(zip(test_labels, steady_state_error_mpct)):
-        plt.text(x, y + 0.02, f"{y:.2f}", ha='center', color='C0')  # MPCT values
-    for i, (x, y) in enumerate(zip(test_labels, steady_state_error_mpck)):
-        plt.text(x, y + 0.02, f"{y:.2f}", ha='center', color='red')   # MPCK values
-
+    # Save the figure
     # plt.savefig("/Users/joefarah/Desktop/Figures/E&C_Final/Task_4/mpct_mpck_test_sse.png", dpi=300)
     plt.show()
 
     # Plot Settling Time
     plt.figure(figsize=(10, 5))
-    plt.plot(test_labels, settling_time_mpct, label='MPCT', marker='o')
-    plt.plot(test_labels, settling_time_mpck, label='MPCK', marker='o', color='red', linestyle='--', zorder=3)
+    plt.bar(x - bar_width/2, settling_time_mpct, width=bar_width, label='MPCT', color='C0', zorder=3)
+    plt.bar(x + bar_width/2, settling_time_mpck, width=bar_width, label='MPCK', color='red', zorder=3)
     plt.title("Settling Time Comparison")
     plt.xlabel("Test Scenarios")
     plt.ylabel("Settling Time (s)")
+    plt.xticks(x, test_labels)
     plt.legend()
-    plt.grid()
+    plt.grid(axis='y', zorder=-1, alpha=0.5)
 
-    plt.ylim(0, 6)
+    # Add values on top of each bar
+    for i, (mpct, mpck) in enumerate(zip(settling_time_mpct, settling_time_mpck)):
+        plt.text(i - bar_width/2, mpct + 0.08, f"{mpct:.2f}", ha='center', color='C0', zorder=4)
+        plt.text(i + bar_width/2, mpck + 0.08, f"{mpck:.2f}", ha='center', color='red', zorder=4)
 
-    # Add values above markers for Settling Time
-    for i, (x, y) in enumerate(zip(test_labels, settling_time_mpct)):
-        plt.text(x, y + 0.3, f"{y:.2f}", ha='center', color='C0')  # MPCT values
-    for i, (x, y) in enumerate(zip(test_labels, settling_time_mpck)):
-        plt.text(x, y + 0.3, f"{y:.2f}", ha='center', color='red')   # MPCK values
-
+    # Save the figure
     # plt.savefig("/Users/joefarah/Desktop/Figures/E&C_Final/Task_4/mpct_mpck_test_settlingtime.png", dpi=300)
     plt.show()
 
     # Plot Overshoot
     plt.figure(figsize=(10, 5))
-    plt.plot(test_labels, overshoot_mpct, label='MPCT', marker='o')
-    plt.plot(test_labels, overshoot_mpck, label='MPCK', marker='o', color='red', linestyle='--', zorder=3)
+    plt.bar(x - bar_width/2, overshoot_mpct, width=bar_width, label='MPCT', color='C0', zorder=3)
+    plt.bar(x + bar_width/2, overshoot_mpck, width=bar_width, label='MPCK', color='red', zorder=3)
     plt.title("Overshoot Comparison")
     plt.xlabel("Test Scenarios")
     plt.ylabel("Overshoot (%)")
+    plt.xticks(x, test_labels)
     plt.legend()
-    plt.grid()
+    plt.grid(axis='y', zorder=-1, alpha=0.5)
+    plt.ylim(-30, 30)
 
-    min_overshoot = 0
-    if min(overshoot_mpck) < min(overshoot_mpct):
-        min_overshoot = min(overshoot_mpck)
-    else:
-        min_overshoot = min(overshoot_mpct)
+    # Add values on top or bottom of each bar for Overshoot
+    for i, (mpct, mpck) in enumerate(zip(overshoot_mpct, overshoot_mpck)):
+        # For MPCT bars
+        if mpct >= 0:
+            plt.text(i - bar_width/2, mpct + 0.6, f"{mpct:.2f}%", ha='center', color='C0', zorder=4)
+        else:
+            plt.text(i - bar_width/2, mpct - 1.8, f"{mpct:.2f}%", ha='center', color='C0', zorder=4)
 
-    max_overshoot = 0
-    if max(overshoot_mpck) > max(overshoot_mpct):
-        max_overshoot = max(overshoot_mpck)
-    else:
-        max_overshoot = max(overshoot_mpct)
+        # For MPCK bars
+        if mpck >= 0:
+            plt.text(i + bar_width/2, mpck + 0.6, f"{mpck:.2f}%", ha='center', color='red', zorder=4)
+        else:
+            plt.text(i + bar_width/2, mpck - 1.8, f"{mpck:.2f}%", ha='center', color='red', zorder=4)
 
-    plt.ylim(min_overshoot - 5, max_overshoot + 5)
-
-    # Add values above markers for Overshoot
-    for i, (x, y) in enumerate(zip(test_labels, overshoot_mpct)):
-        plt.text(x, y + 1, f"{y:.2f}%", ha='center', color='C0')  # MPCT values
-    for i, (x, y) in enumerate(zip(test_labels, overshoot_mpck)):
-        plt.text(x, y + 1, f"{y:.2f}%", ha='center', color='red')   # MPCK values
-
+    # Save the figure
     # plt.savefig("/Users/joefarah/Desktop/Figures/E&C_Final/Task_4/mpct_mpck_test_overshoot.png", dpi=300)
     plt.show()

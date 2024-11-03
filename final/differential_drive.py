@@ -179,9 +179,9 @@ def run(linearization_type=DYNAMIC, init_pos=[2.0, 3.0, 0.0], init_quat=[0,0,0.3
     cur_u_for_linearization = np.zeros(num_controls)
 
     regulator.updateSystemMatrices(sim,cur_state_x_for_linearization,cur_u_for_linearization)
-    # Define the cost matrices
+    # Define the cost matrices, can be changed depending on the task
     Qcoeff = np.array([250, 250, 280.0]) 
-    Rcoeff = [0.5, 0.2]
+    Rcoeff = [0.5, 0.2] 
     regulator.setCostMatrices(Qcoeff,Rcoeff)
 
     u_mpc = np.zeros(num_controls)
